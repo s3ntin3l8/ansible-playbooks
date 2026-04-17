@@ -1,0 +1,4 @@
+---
+# roles/homebrew/defaults/main.yml
+homebrew_user: "openclaw"
+homebrew_home: "/home/openclaw"

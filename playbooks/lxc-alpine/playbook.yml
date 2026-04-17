@@ -1,0 +1,25 @@
+---
+- name: Deploy Alpine Linux LXC on Proxmox
+  hosts: proxmox
+  gather_facts: no
+  roles:
+    - role: lxc-alpine
+      vars:
+        lxc_type: "{{ lxc_type | default('core') }}"
+        lxc_index: "{{ lxc_index | default(1) }}"
+        lxc_memory: 512
+        lxc_cores: 1
+
+- name: Configure the new Alpine LXC container
+  hosts: "{{ lxc_hostname | default('managed_containers') }}"
+  gather_facts: yes
+  become: yes
+  roles:
+    - common
+  tasks:
+    - name: Install extra packages
+      ansible.builtin.apk:
+        update_cache: yes
+        name:
+          - bash  # For those who prefer bash over ash
+        state: present

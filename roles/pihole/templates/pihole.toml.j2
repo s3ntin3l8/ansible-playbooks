@@ -1,0 +1,19 @@
+# pihole.toml.j2
+# Managed by Ansible
+
+[dns]
+  upstreams = [ "{{ pihole_dns_1 }}", "{{ pihole_dns_2 }}" ]
+  listeningMode = "{{ pihole_dns_listening_mode }}"
+  ipv4 = true
+  ipv6 = false
+
+[webserver]
+  port = {{ pihole_web_port }}
+  interface = "0.0.0.0"
+
+[webserver.api]
+  # Double SHA256 hash of the password
+  password = "{{ pihole_webpassword_hash }}"
+
+[database]
+  maxDBdays = 365

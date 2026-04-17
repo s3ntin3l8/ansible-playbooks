@@ -1,0 +1,181 @@
+---
+- name: Provision Proxmox VM from Template
+  hosts: proxmox
+  gather_facts: false
+  vars:
+    # Proxmox VM settings
+    template_id: 9000
+    new_vmid: 400
+    vm_name: "openclaw-vm"
+    vm_cores: 4
+    vm_memory: 8192
+    vm_storage: "local-lvm"
+    snippet_storage: "local"
+
+    # Disk settings
+    vm_disk_name: "scsi0"
+    vm_disk_size: "32G"
+
+    # Network settings
+    network_bridge: "vmbr0"
+    
+    # User Provisioning
+    ansible_pubkey: "{{ lookup('env', 'ANSIBLE_SSH_PUBKEY') }}"
+    github_username: "{{ lookup('env', 'GITHUB_USERNAME') }}"
+
+    # Proxmox tags
+    vm_tags: "vm,ubuntu"
+
+  tasks:
+    - name: Ensure snippets directory exists
+      ansible.builtin.file:
+        path: "/var/lib/vz/snippets/"
+        state: directory
+        mode: '0755'
+
+    - name: Generate cloud-init user-data snippet
+      ansible.builtin.template:
+        src: "user-data.yml.j2"
+        dest: "/var/lib/vz/snippets/{{ vm_name }}-user-data.yml"
+
+    - name: Check if VM already exists
+      ansible.builtin.command: "qm status {{ new_vmid }}"
+      register: vm_status
+      failed_when: false
+      changed_when: false
+
+    - name: Clone VM from template
+      ansible.builtin.command: "qm clone {{ template_id }} {{ new_vmid }} --name {{ vm_name }} --full 1"
+      when: vm_status.rc != 0
+
+    - name: Configure VM hardware
+      ansible.builtin.command: >
+        qm set {{ new_vmid }}
+        --cores {{ vm_cores }}
+        --memory {{ vm_memory }}
+        --net0 virtio,bridge={{ network_bridge }}
+        --agent 1
+        --tags {{ vm_tags }}
+        --serial0 socket
+        --ipconfig0 ip=dhcp,ip6=dhcp
+      when: vm_status.rc != 0
+
+    - name: Resize primary disk
+      ansible.builtin.command: "qm resize {{ new_vmid }} {{ vm_disk_name }} {{ vm_disk_size }}"
+      when: vm_status.rc != 0
+
+    - name: Ensure cloudinit drive is attached
+      ansible.builtin.command: "qm set {{ new_vmid }} --ide2 {{ vm_storage }}:cloudinit"
+      when: vm_status.rc != 0
+      failed_when: false
+
+    - name: Attach custom cloud-init snippets
+      ansible.builtin.command: >
+        qm set {{ new_vmid }}
+        --cicustom "user={{ snippet_storage }}:snippets/{{ vm_name }}-user-data.yml"
+
+    - name: Regenerate cloud-init image
+      ansible.builtin.command: "qm cloudinit update {{ new_vmid }}"
+
+    - name: Start VM
+      ansible.builtin.command: "qm start {{ new_vmid }}"
+      when: vm_status.rc != 0
+
+    - name: Wait for QEMU guest agent to start
+      ansible.builtin.command: "qm guest cmd {{ new_vmid }} ping"
+      register: agent_status
+      until: agent_status.rc == 0
+      retries: 120
+      delay: 5
+      changed_when: false
+      when: vm_status.rc != 0
+
+    - name: Get VM IP
+      ansible.builtin.shell: "qm guest cmd {{ new_vmid }} network-get-interfaces | grep -oE '192\\.168\\.[0-9]+\\.[0-9]+' | head -n 1"
+      register: vm_ip_raw
+      until: vm_ip_raw.stdout != ""
+      retries: 30
+      delay: 5
+      changed_when: false
+      when: vm_status.rc != 0
+
+    - name: Persistently add host to global inventory file
+      delegate_to: localhost
+      ansible.builtin.blockinfile:
+        path: "{{ playbook_dir }}/../../inventory.yml"
+        marker: "# {mark} ANSIBLE MANAGED HOST - {{ vm_name }}"
+        insertafter: "managed_containers:"
+        block: |
+          {{ ' ' * 4 }}hosts:
+          {{ ' ' * 6 }}{{ vm_name }}:
+          {{ ' ' * 8 }}ansible_host: {{ vm_ip_raw.stdout }}
+          {{ ' ' * 8 }}ansible_user: bjoern
+
+    - name: Add new VM to in-memory inventory for immediate use
+      add_host:
+        name: "{{ vm_name }}"
+        ansible_host: "{{ vm_ip_raw.stdout }}"
+        ansible_user: ansible
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+      changed_when: false
+
+- name: Configure the new VM
+  hosts: "{{ vm_name | default('openclaw-vm') }}"
+  gather_facts: yes
+  become: yes
+  tasks:
+    - name: Update all packages to the latest version
+      apt:
+        update_cache: yes
+        upgrade: dist
+        cache_valid_time: 3600
+
+    - name: Create bjoern user
+      ansible.builtin.user:
+        name: bjoern
+        uid: 1000
+        groups: sudo
+        append: yes
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Allow bjoern to have passwordless sudo
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/bjoern
+        state: present
+        create: yes
+        mode: '0440'
+        line: 'bjoern ALL=(ALL) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
+
+    - name: Fetch bjoern public keys from GitHub
+      ansible.builtin.uri:
+        url: "https://github.com/{{ github_username }}.keys"
+        return_content: yes
+      register: bjoern_github_keys
+
+    - name: Install bjoern public keys
+      ansible.builtin.authorized_key:
+        user: bjoern
+        state: present
+        key: "{{ bjoern_github_keys.content }}"
+
+    - name: Ensure SSH password authentication is disabled
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+      notify: Restart SSH
+
+    - name: Ensure root login with password is disabled in SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin prohibit-password'
+      notify: Restart SSH
+
+  handlers:
+    - name: Restart SSH
+      service:
+        name: ssh
+        state: restarted

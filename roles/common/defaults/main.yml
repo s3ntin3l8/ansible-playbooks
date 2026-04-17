@@ -1,0 +1,16 @@
+---
+# Baseline user configuration
+ansible_uid: 1001
+bjoern_uid: 1000
+ansible_pubkey: "{{ lookup('env', 'ANSIBLE_SSH_PUBKEY') }}"
+github_username: "{{ lookup('env', 'GITHUB_USERNAME') }}"
+
+# Essential packages for every server
+baseline_packages:
+  - nano
+  - curl
+  - htop
+  - git
+  - tmux
+  - acl
+  - net-tools

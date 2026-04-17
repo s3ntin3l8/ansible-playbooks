@@ -1,0 +1,54 @@
+---
+# roles/pihole/tasks/main.yml
+- name: Install dependencies
+  ansible.builtin.package:
+    name:
+      - curl
+      - git
+      - dnsutils
+      - debconf-utils
+      - python3-passlib
+    state: present
+
+- name: Ensure /etc/pihole exists
+  ansible.builtin.file:
+    path: /etc/pihole
+    state: directory
+    mode: '0755'
+
+- name: Generate password hash
+  ansible.builtin.set_fact:
+    pihole_webpassword_hash: "{{ (pihole_admin_password | string | hash('sha256') | hash('sha256')) }}"
+  no_log: true
+
+- name: Deploy pihole.toml configuration
+  ansible.builtin.template:
+    src: pihole.toml.j2
+    dest: /etc/pihole/pihole.toml
+    mode: '0644'
+
+- name: Check if Pi-hole is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/pihole
+  register: pihole_binary
+
+- name: Download Pi-hole installer
+  ansible.builtin.get_url:
+    url: https://install.pi-hole.net
+    dest: /tmp/basic-install.sh
+    mode: '0755'
+  when: not pihole_binary.stat.exists
+
+- name: Run Pi-hole unattended installer
+  ansible.builtin.command:
+    cmd: /tmp/basic-install.sh --unattended
+  when: not pihole_binary.stat.exists
+  changed_when: true
+  environment:
+    DEBIAN_FRONTEND: noninteractive
+
+- name: Ensure Pi-hole services are started and enabled
+  ansible.builtin.service:
+    name: pihole-FTL
+    state: started
+    enabled: true

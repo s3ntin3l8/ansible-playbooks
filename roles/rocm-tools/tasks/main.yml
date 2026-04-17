@@ -1,0 +1,9 @@
+---
+- name: Install AMD ROCm Tools (Ubuntu/Debian)
+  apt:
+    name:
+      - rocm-smi
+      - rocm-dev
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"

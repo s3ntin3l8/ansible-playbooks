@@ -1,0 +1,49 @@
+---
+- name: Prepare Proxmox Host and Deploy LXC for k3s
+  hosts: proxmox
+  become: true
+  gather_facts: no
+  vars:
+    lxc_type: k3s
+    lxc_index: 1
+    lxc_memory: 4096
+    lxc_cores: 2
+    lxc_disk_size: 20G
+    lxc_extra_config: |
+      lxc.apparmor.profile: unconfined
+      lxc.cgroup.devices.allow: a
+      lxc.cap.drop: 
+      lxc.mount.auto: "proc:rw sys:rw"
+
+  tasks:
+    - name: Load kernel modules on Proxmox host
+      community.general.modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: Enable IP forwarding on Proxmox host
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: yes
+
+    - name: Deploy LXC container
+      ansible.builtin.include_role:
+        name: lxc-ubuntu
+
+- name: Install and Configure k3s on the new LXC
+  hosts: "{{ hostvars['proxmox']['deployed_lxc_hostname'] | default(lxc_hostname) | default('k3s_hosts') }}"
+  become: true
+  gather_facts: yes
+  
+  vars:
+    # Optional: disable some default k3s components to keep LXC lightweight
+    k3s_install_flags: "--disable traefik --disable servicelb"
+
+  roles:
+    - common
+    - k3s

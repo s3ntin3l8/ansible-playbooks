@@ -1,0 +1,43 @@
+---
+- name: Ensure LXC VMID is provided
+  fail:
+    msg: "lxc_gpu_vmid must be provided when running on Proxmox host"
+  when: lxc_gpu_vmid is none
+
+- name: Configure Intel GPU device nodes for LXC
+  ansible.builtin.blockinfile:
+    path: "/etc/pve/lxc/{{ lxc_gpu_vmid }}.conf"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Intel GPU Passthrough"
+    block: |
+      lxc.cgroup2.devices.allow: c 226:* rwm
+      lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir
+  when: gpu_type == 'intel'
+
+- name: Configure AMD GPU device nodes for LXC
+  ansible.builtin.blockinfile:
+    path: "/etc/pve/lxc/{{ lxc_gpu_vmid }}.conf"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - AMD GPU Passthrough"
+    block: |
+      lxc.cgroup2.devices.allow: c 226:* rwm
+      lxc.cgroup2.devices.allow: c 289:* rwm
+      lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir
+      lxc.mount.entry: /dev/kfd dev/kfd none bind,optional,create=file
+  when: gpu_type == 'amd'
+
+- name: Configure NVIDIA device nodes for LXC
+  ansible.builtin.blockinfile:
+    path: "/etc/pve/lxc/{{ lxc_gpu_vmid }}.conf"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - NVIDIA GPU Passthrough"
+    block: |
+      lxc.cgroup2.devices.allow: c 195:* rwm
+      lxc.cgroup2.devices.allow: c 236:* rwm
+      lxc.cgroup2.devices.allow: c 507:* rwm
+      lxc.mount.entry: /dev/nvidia0 dev/nvidia0 none bind,optional,create=file
+      lxc.mount.entry: /dev/nvidiactl dev/nvidiactl none bind,optional,create=file
+      lxc.mount.entry: /dev/nvidia-uvm dev/nvidia-uvm none bind,optional,create=file
+      lxc.mount.entry: /dev/nvidia-uvm-tools dev/nvidia-uvm-tools none bind,optional,create=file
+  when: gpu_type == 'nvidia'
+
+- name: Restart LXC to apply changes
+  command: "pct reboot {{ lxc_gpu_vmid }}"
+  changed_when: true

@@ -1,0 +1,56 @@
+---
+- name: Proxmox Host Health and Maintenance
+  hosts: proxmox
+  gather_facts: yes
+  tasks:
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+        cache_valid_time: 3600
+      register: apt_upgrade_result
+
+    - name: Display upgrade results
+      debug:
+        msg: "Proxmox Host Updated"
+      when: apt_upgrade_result.changed
+
+    - name: Check disk usage of root filesystem
+      shell: df -h / | tail -1 | awk '{print $5}' | sed 's/%//'
+      register: disk_usage
+      changed_when: false
+
+    - name: Fail if disk usage is above 90%
+      fail:
+        msg: "CRITICAL: Root disk usage is at {{ disk_usage.stdout }}%"
+      when: disk_usage.stdout | int > 90
+
+    - name: Clean up old Proxmox templates (older than 30 days)
+      find:
+        paths: /var/lib/vz/template/cache/
+        age: 30d
+        recurse: no
+      register: old_templates
+
+    - name: Remove old templates
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_templates.files }}"
+      when: old_templates.matched > 0
+
+    - name: Check for pve-cluster service status
+      systemd:
+        name: pve-cluster
+        state: started
+      register: pve_cluster_status
+
+    - name: Verify PVE services health
+      debug:
+        msg: "PVE Cluster service is running"
+      when: pve_cluster_status.status.ActiveState == 'active'
+
+  post_tasks:
+    - name: Maintenance Summary
+      debug:
+        msg: "Proxmox maintenance complete. Disk Usage: {{ disk_usage.stdout }}%. Old templates cleaned: {{ old_templates.matched }}."

@@ -1,0 +1,95 @@
+.PHONY: help lxc vm maint inv check list management destroy
+
+# Variables
+VENV := ./venv/bin/activate
+# Load .env if it exists
+ifneq ("$(wildcard .env)","")
+    include .env
+    export $(shell sed 's/=.*//' .env)
+endif
+
+ANSIBLE_BASE := . $(VENV) && 
+ANSIBLE := $(ANSIBLE_BASE) ansible-playbook
+INVENTORY := ./inventory.yml
+
+.PHONY: help lxc vm maint inv check list management destroy prepare
+
+help:
+	@echo "Available commands:"
+	@echo "  make prepare    - Render dynamic inventory from .env"
+	@echo "  make lxc        - Deploy a new Ubuntu LXC container"
+	@echo "  make vm         - Deploy a new Ubuntu VM from template"
+	@echo "  make destroy id=123 - Stop, destroy LXC and cleanup DNS/Inventory"
+	@echo "  make maint      - Run Proxmox host maintenance (updates, cleanup)"
+	@echo "  make inv        - Show dynamic/static inventory graph"
+	@echo "  make check      - Run syntax check on all playbooks"
+	@echo "  make list       - List all managed hosts"
+	@echo "  make management - Deploy management apps (Uptime Kuma, NetBox)"
+	@echo "  make pihole     - Install Pi-hole v6 (Bare Metal)"
+	@echo "  make k3s        - Deploy K3s on Proxmox LXC"
+	@echo "  make alpine     - Deploy a new Alpine LXC container"
+
+prepare:
+	@if [ ! -f .env ]; then echo "Error: .env file missing. Copy .env.example to .env and fill in your values."; exit 1; fi
+	@echo "🛠️  Preparing Proxmox and Static inventories..."
+	@$(ANSIBLE_BASE) ansible localhost -m template -a "src=proxmox.yml.j2 dest=proxmox.yml" > /dev/null
+	@$(ANSIBLE_BASE) ansible localhost -m template -a "src=inventory.yml.j2 dest=inventory.yml" > /dev/null
+
+lxc: prepare
+	@echo "🚀 Deploying Ubuntu LXC..."
+	$(ANSIBLE) playbooks/lxc-ubuntu/playbook.yml
+
+dev-box: prepare
+	@echo "🚀 Deploying Dev Box..."
+	$(ANSIBLE) playbooks/deploy-dev-box.yml
+
+alpine: prepare
+	@echo "🚀 Deploying Alpine LXC..."
+	$(ANSIBLE) playbooks/lxc-alpine/playbook.yml
+
+destroy: prepare
+	@if [ -z "$(id)" ]; then \
+		echo "Error: You must provide an id. Example: make destroy id=601"; \
+		exit 1; \
+	fi
+	@echo "⚠️  Destroying LXC $(id)..."
+	$(ANSIBLE) playbooks/destroy-lxc.yml -e lxc_vmid=$(id)
+
+pihole: prepare
+	@echo "🚀 Installing Pi-hole..."
+	$(ANSIBLE) playbooks/install-pihole.yml
+
+k3s: prepare
+	@echo "🚀 Deploying K3s..."
+	$(ANSIBLE) playbooks/deploy-k3s-lxc.yml
+
+vm: prepare
+	@echo "🚀 Deploying VM..."
+	$(ANSIBLE) playbooks/deploy-vm/playbook.yml
+
+maint: prepare
+	@echo "🛠️  Running Maintenance..."
+	$(ANSIBLE) playbooks/proxmox-maintenance/maintenance.yml
+
+inv: prepare
+	@echo "📊 Current Inventory Graph:"
+	@$(ANSIBLE_BASE) ansible-inventory --graph
+
+check: prepare
+	@echo "📋 Checking Playbook Syntax..."
+	$(ANSIBLE) playbooks/lxc-ubuntu/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc-alpine/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/deploy-vm/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/proxmox-maintenance/maintenance.yml --syntax-check
+	$(ANSIBLE) playbooks/management-apps.yml --syntax-check
+	$(ANSIBLE) playbooks/install-pihole.yml --syntax-check
+	$(ANSIBLE) playbooks/deploy-k3s-lxc.yml --syntax-check
+	$(ANSIBLE) playbooks/deploy-dev-box.yml --syntax-check
+
+management: prepare
+	@echo "🚀 Deploying Management Apps..."
+	$(ANSIBLE) playbooks/management-apps.yml
+
+list: prepare
+	@echo "📋 Managed Host List:"
+	@$(ANSIBLE_BASE) ansible-inventory --list | grep -oE '\"ansible_host\": \"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\"' | cut -d'\"' -f4 | sort -u

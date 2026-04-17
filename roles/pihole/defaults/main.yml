@@ -1,0 +1,13 @@
+---
+# roles/pihole/defaults/main.yml
+pihole_version: "v6"
+pihole_interface: "{{ ansible_default_ipv4.interface | default('eth0') }}"
+pihole_ipv4_address: "{{ ansible_default_ipv4.address }}"
+pihole_dns_1: "1.1.1.1"
+pihole_dns_2: "1.0.0.1"
+pihole_admin_password: "{{ lookup('env', 'PIHOLE_ADMIN_PASSWORD') | default('changeme', true) }}"
+pihole_web_port: 80
+pihole_install_web_interface: true
+pihole_install_web_server: true
+pihole_query_logging: true
+pihole_dns_listening_mode: "single"  # options: "single", "bind", "all", "local"

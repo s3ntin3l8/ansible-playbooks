@@ -1,0 +1,29 @@
+# Proxmox Dynamic Inventory Plugin
+plugin: community.proxmox.proxmox
+user: {{ lookup('env', 'PROXMOX_USER') }}
+token_id: "{{ lookup('env', 'PROXMOX_TOKEN_ID') }}"
+# Securely vaulted token secret
+token_secret: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          37663462633237323065343563303236666561393537656532396562643964313532656564303564
+          3539316235376466393338626434313935393839396239380a376434386236353766623835316431
+          35383562376436643036336136633139303835616261363433616138393838353132326436343033
+          6335396333363664390a336263393733323366383161326234343530326235613534656634613236
+          33643233626664613863666364313966313034366234363937353564366631663365616566363261
+          3431643164626336373039313562613639623966616336623935
+url: {{ lookup('env', 'PROXMOX_URL') }}
+validate_certs: no
+want_facts: true
+
+compose:
+  # Pulls the first valid IP from LXC interfaces or VM agent info
+  ansible_host: >-
+    (proxmox_lxc_interfaces | default([]) | selectattr('name', 'ne', 'lo') | map(attribute='inet') | first | default('') | regex_replace('/.*', ''))
+    if proxmox_vmtype == 'lxc' else
+    (proxmox_agent_interfaces | default([]) | selectattr('name', 'ne', 'lo') | map(attribute='ip-addresses') | first | first | default('') | regex_replace('/.*', ''))
+
+groups:
+  lxc: type == 'lxc'
+  qemu: type == 'qemu'
+  running: status == 'running'
+  docker_hosts: "'dockerhost' in proxmox_name"

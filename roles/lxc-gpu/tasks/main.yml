@@ -1,0 +1,8 @@
+---
+- name: Apply Proxmox host-side configuration
+  include_tasks: proxmox.yml
+  when: inventory_hostname in groups['proxmox']
+
+- name: Apply LXC container-side configuration
+  include_tasks: lxc.yml
+  when: inventory_hostname not in groups['proxmox']

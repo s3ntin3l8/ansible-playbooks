@@ -1,0 +1,41 @@
+---
+- name: Provision OpenClaw Ubuntu LXC on Proxmox
+  hosts: proxmox
+  gather_facts: no
+  roles:
+    - role: lxc-ubuntu
+      vars:
+        lxc_type: "{{ _lxc_type | default('openclaw') }}"
+        lxc_index: "{{ _lxc_index | default(1) }}"
+        # Resource Overrides for OpenClaw (Node.js + Docker build workload)
+        lxc_cores: 4
+        lxc_memory: 4096
+        lxc_disk_size: 20G
+
+- name: Configure and Install OpenClaw
+  hosts: "{{ deployed_lxc_hostname | default('openclaw-01') }}"
+  gather_facts: yes
+  become: yes
+  vars:
+    # Ensure role finds its internal assets
+    ansible_python_interpreter: /usr/bin/python3
+  roles:
+    - common
+    - role: openclaw
+      vars:
+        tailscale_enabled: true
+        tailscale_authkey: "{{ vault_tailscale_authkey | default('') }}"
+        openclaw_ssh_keys:
+          - "{{ lookup('env', 'BJOERN_SSH_PUBKEY') }}"
+    - homebrew
+
+  post_tasks:
+    - name: Copy ASCII art script
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/openclaw/templates/show-lobster.sh.j2"
+        dest: /tmp/show-lobster.sh
+        mode: '0755'
+
+    - name: Display ASCII art
+      ansible.builtin.command: /tmp/show-lobster.sh
+      changed_when: false

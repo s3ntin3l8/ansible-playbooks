@@ -1,0 +1,38 @@
+---
+# group_vars/all/lxc_config.yml
+# Centralized naming and numbering scheme for Proxmox resources
+
+lxc_naming_schemes:
+  core:
+    id_start: 100
+    prefix: "core"
+  pihole:
+    id_start: 100
+    prefix: "pihole"
+  ts:
+    id_start: 100
+    prefix: "tailscale"
+  docker:
+    id_start: 300
+    prefix: "dockerhost"
+  k3s:
+    id_start: 400
+    prefix: "k3s"
+  dev:
+    id_start: 500
+    prefix: "dev"
+  openclaw:
+    id_start: 600
+    prefix: "openclaw"
+  generic:
+    id_start: 900
+    prefix: "lxc"
+
+# Default fallback values for roles
+lxc_type: "core"
+lxc_index: 1
+
+# Logic to calculate defaults if not explicitly provided
+lxc_vmid: "{{ lxc_naming_schemes[lxc_type | default('core')].id_start + (lxc_index | default(1) | int) }}"
+lxc_hostname: "{{ lxc_naming_schemes[lxc_type | default('core')].prefix }}-{{ '%02d' | format(lxc_index | default(1) | int) }}"
+

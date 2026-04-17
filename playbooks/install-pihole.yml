@@ -1,0 +1,7 @@
+---
+- name: Install Pi-hole (Bare Metal)
+  hosts: pihole_hosts
+  become: true
+
+  roles:
+    - pihole

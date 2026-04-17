@@ -1,0 +1,25 @@
+---
+- name: Proxmox LXC setup for Tailscale Router
+  hosts: proxmox
+  gather_facts: false
+  roles:
+    - role: lxc-ubuntu
+      vars:
+        lxc_type: ts
+        lxc_index: 2
+        lxc_memory: "512"
+        inventory_insert_after: "tailscale_routers:"
+        lxc_extra_config: |
+          lxc.cgroup2.devices.allow: c 10:200 rwm
+          lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+
+- name: Configure the new Tailscale Router
+  hosts: "{{ lxc_hostname | default('tailscale-router') }}"
+  gather_facts: yes
+  become: yes
+  vars:
+    subnet_routes: "{{ lookup('env', 'TAILSCALE_SUBNET') }}"
+
+  roles:
+    - common
+    - tailscale

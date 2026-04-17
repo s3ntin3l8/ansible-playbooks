@@ -1,0 +1,6 @@
+---
+- name: Install AI CLI Tools
+  hosts: all
+  become: true
+  roles:
+    - ai-tools

@@ -1,0 +1,103 @@
+---
+- name: OS-specific setup (Debian/Ubuntu)
+  block:
+    - name: Update apt cache and upgrade all packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+        cache_valid_time: 3600
+
+    - name: Install baseline packages (Debian)
+      apt:
+        name: "{{ baseline_packages + ['unattended-upgrades', 'dnsutils'] }}"
+        state: present
+
+    - name: Set sudo group name (Debian)
+      set_fact:
+        sudo_group: "sudo"
+  when: ansible_os_family == "Debian"
+
+- name: OS-specific setup (Alpine)
+  block:
+    - name: Update apk cache and upgrade all packages
+      apk:
+        update_cache: yes
+        upgrade: yes
+
+    - name: Install baseline packages (Alpine)
+      apk:
+        name: "{{ baseline_packages + ['sudo', 'bind-tools'] }}"
+        state: present
+
+    - name: Set sudo group name (Alpine)
+      set_fact:
+        sudo_group: "wheel"
+  when: ansible_os_family == "Alpine"
+
+- name: Create ansible user
+  ansible.builtin.user:
+    name: ansible
+    uid: "{{ ansible_uid }}"
+    groups: "{{ sudo_group }}"
+    append: yes
+    shell: /bin/bash
+    create_home: yes
+
+- name: Allow ansible to have passwordless sudo
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/ansible
+    state: present
+    create: yes
+    mode: '0440'
+    line: 'ansible ALL=(ALL) NOPASSWD: ALL'
+    validate: 'visudo -cf %s'
+
+- name: Install ansible public key
+  ansible.builtin.authorized_key:
+    user: ansible
+    state: present
+    key: "{{ ansible_pubkey }}"
+
+- name: Create bjoern user
+  ansible.builtin.user:
+    name: bjoern
+    uid: "{{ bjoern_uid }}"
+    groups: "{{ sudo_group }}"
+    append: yes
+    shell: /bin/bash
+    create_home: yes
+
+- name: Allow bjoern to have passwordless sudo
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/bjoern
+    state: present
+    create: yes
+    mode: '0440'
+    line: 'bjoern ALL=(ALL) NOPASSWD: ALL'
+    validate: 'visudo -cf %s'
+
+- name: Fetch bjoern public keys from GitHub
+  ansible.builtin.uri:
+    url: "https://github.com/{{ github_username }}.keys"
+    return_content: yes
+  register: bjoern_github_keys
+
+- name: Install bjoern public keys
+  ansible.builtin.authorized_key:
+    user: bjoern
+    state: present
+    key: "{{ bjoern_github_keys.content }}"
+
+- name: Ensure SSH password authentication is disabled
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+  notify: Restart SSH
+
+- name: Ensure root login with password is disabled in SSH
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin prohibit-password'
+  notify: Restart SSH

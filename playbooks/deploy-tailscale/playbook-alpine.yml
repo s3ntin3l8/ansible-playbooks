@@ -1,0 +1,32 @@
+---
+- name: Proxmox LXC setup for Tailscale Router (Alpine)
+  hosts: proxmox
+  gather_facts: false
+  roles:
+    - role: lxc-alpine
+      vars:
+        lxc_type: ts
+        lxc_index: 1
+        lxc_memory: "256"
+        lxc_disk_size: "2G"
+        inventory_insert_after: "tailscale_routers:"
+        # Tailscale requires TUN/TAP
+        lxc_extra_config: |
+          lxc.cgroup2.devices.allow: c 10:200 rwm
+          lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+        # Extra packages for this specific router
+        lxc_bootstrap_packages:
+          - python3
+          - sudo
+          - openssh
+          - bash
+
+- name: Configure Tailscale Subnet Router over SSH
+  hosts: "{{ lxc_hostname | default('tailscale_routers') }}"
+  gather_facts: true
+  become: true
+  vars:
+    subnet_routes: "{{ lookup('env', 'TAILSCALE_SUBNET') }}"
+  roles:
+    - common
+    - tailscale

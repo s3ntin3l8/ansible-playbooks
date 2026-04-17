@@ -1,0 +1,105 @@
+---
+- name: Install system dependencies for Hermes Agent
+  become: true
+  ansible.builtin.apt:
+    name:
+      - git
+      - ripgrep
+      - ffmpeg
+      - curl
+      - nodejs
+      - npm
+    state: present
+    update_cache: true
+
+- name: Install uv (Python package manager)
+  ansible.builtin.shell:
+    cmd: curl -LsSf https://astral.sh/uv/install.sh | sh
+    creates: "{{ ansible_user_dir }}/.local/bin/uv"
+
+- name: Create Hermes Agent install directory
+  ansible.builtin.file:
+    path: "{{ hermes_agent_install_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Clone Hermes Agent repository
+  ansible.builtin.git:
+    repo: "{{ hermes_agent_repo }}"
+    dest: "{{ hermes_agent_install_dir }}"
+    version: "{{ hermes_agent_version }}"
+    recursive: true
+    update: true
+
+- name: Create Python virtual environment and install dependencies
+  ansible.builtin.shell:
+    cmd: >
+      {{ ansible_user_dir }}/.local/bin/uv venv venv --python {{ hermes_agent_python_version }} &&
+      {{ ansible_user_dir }}/.local/bin/uv pip install -e ".{{ hermes_agent_extras }}" &&
+      {{ ansible_user_dir }}/.local/bin/uv pip install -e "./tinker-atropos"
+    chdir: "{{ hermes_agent_install_dir }}"
+    creates: "{{ hermes_agent_install_dir }}/venv"
+
+- name: Install Node.js dependencies
+  ansible.builtin.shell:
+    cmd: npm install
+    chdir: "{{ hermes_agent_install_dir }}"
+    creates: "{{ hermes_agent_install_dir }}/node_modules"
+
+- name: Create Hermes configuration directories
+  ansible.builtin.file:
+    path: "{{ hermes_agent_config_dir }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - cron
+    - sessions
+    - logs
+    - memories
+    - skills
+    - pairing
+    - hooks
+    - image_cache
+    - audio_cache
+    - whatsapp/session
+
+- name: Provision initial config.yaml from example
+  ansible.builtin.copy:
+    src: "{{ hermes_agent_install_dir }}/cli-config.yaml.example"
+    dest: "{{ hermes_agent_config_dir }}/config.yaml"
+    remote_src: true
+    force: false
+
+- name: Initialize empty .env file
+  ansible.builtin.file:
+    path: "{{ hermes_agent_config_dir }}/.env"
+    state: touch
+    mode: '0600'
+    modification_time: preserve
+    access_time: preserve
+
+- name: Add API keys to .env
+  ansible.builtin.lineinfile:
+    path: "{{ hermes_agent_config_dir }}/.env"
+    line: "{{ item.key }}={{ item.value }}"
+    regexp: "^{{ item.key }}="
+  loop: "{{ hermes_agent_api_keys | dict2items }}"
+
+- name: Ensure bin directory exists
+  ansible.builtin.file:
+    path: "{{ hermes_agent_bin_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Symlink hermes binary
+  ansible.builtin.file:
+    src: "{{ hermes_agent_install_dir }}/venv/bin/hermes"
+    dest: "{{ hermes_agent_bin_dir }}/hermes"
+    state: link
+
+- name: Add bin directory to PATH in .bashrc
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_user_dir }}/.bashrc"
+    line: 'export PATH="{{ hermes_agent_bin_dir }}:$PATH"'
+    regexp: '^export PATH=.*{{ hermes_agent_bin_dir }}.*'
+    state: present

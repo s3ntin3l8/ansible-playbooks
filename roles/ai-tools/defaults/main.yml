@@ -1,0 +1,10 @@
+---
+# Node.js version to install via NodeSource
+ai_tools_node_version: 24
+
+# Global NPM packages to install
+ai_tools_npm_packages:
+  - "@google/gemini-cli"
+  - "@anthropic-ai/claude-code"
+  - "opencode-ai"
+  - "@openai/codex"

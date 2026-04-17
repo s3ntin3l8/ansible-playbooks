@@ -1,0 +1,4 @@
+---
+# roles/lxc-gpu/defaults/main.yml
+gpu_type: "intel" # options: intel, amd, nvidia
+lxc_gpu_vmid: "{{ lxc_vmid | default(none) }}"

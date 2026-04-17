@@ -1,0 +1,137 @@
+---
+# roles/lxc-alpine/tasks/main.yml
+
+- name: Ensure local public SSH key exists
+  delegate_to: localhost
+  stat:
+    path: "{{ lxc_pubkey_file }}"
+  register: pubkey_stat
+
+- name: Read local public SSH key
+  delegate_to: localhost
+  slurp:
+    src: "{{ lxc_pubkey_file }}"
+  register: pubkey_content
+  when: pubkey_stat.stat.exists
+
+- name: Fetch user SSH keys from GitHub
+  delegate_to: localhost
+  uri:
+    url: "https://github.com/{{ github_username }}.keys"
+    return_content: yes
+  register: github_keys
+  when: github_username is defined and github_username | length > 0
+
+- name: Combine SSH keys for root bootstrap
+  set_fact:
+    combined_keys: >-
+      {{ (pubkey_content['content'] | b64decode) if pubkey_stat.stat.exists else '' }}
+      {{ github_keys.content | default('') }}
+
+- name: Copy combined keys to proxmox host temporarily
+  copy:
+    content: "{{ combined_keys }}"
+    dest: "/tmp/lxc_pubkey.pub"
+  when: combined_keys | trim | length > 0
+
+- name: Update Proxmox appliance template list
+  command: pveam update
+  changed_when: false
+
+- name: Find latest Alpine standard template
+  shell: pveam available --section system | grep alpine-.*-default | awk '{print $2}' | sort -V | tail -n 1
+  register: alpine_template
+  changed_when: false
+
+- name: Set template filename
+  set_fact:
+    template_file: "{{ (alpine_template.stdout).split('/')[-1] }}"
+
+- name: Download Alpine template
+  command: "pveam download local {{ alpine_template.stdout }}"
+  args:
+    creates: "/var/lib/vz/template/cache/{{ template_file }}"
+
+- name: Check if LXC container exists
+  command: "pct status {{ lxc_vmid }}"
+  register: lxc_status
+  failed_when: false
+  changed_when: false
+
+- name: Create LXC container
+  command: >
+    pct create {{ lxc_vmid }} local:vztmpl/{{ template_file }}
+    --hostname {{ lxc_hostname }}
+    --storage {{ lxc_storage }}
+    --rootfs {{ lxc_storage }}:{{ lxc_disk_size }}
+    --cores {{ lxc_cores }}
+    --memory {{ lxc_memory }}
+    --net0 {{ lxc_net }}
+    --ssh-public-keys /tmp/lxc_pubkey.pub
+    --features nesting=1,keyctl=1
+    --unprivileged 1
+  when: lxc_status.rc != 0
+
+- name: Apply extra LXC configuration
+  ansible.builtin.blockinfile:
+    path: "/etc/pve/lxc/{{ lxc_vmid }}.conf"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Extra Config"
+    block: "{{ lxc_extra_config }}"
+  when: lxc_extra_config | length > 0
+
+- name: Start LXC container
+  command: "pct start {{ lxc_vmid }}"
+  when: lxc_status.rc != 0 or lxc_status.stdout.find('stopped') != -1
+
+- name: Wait for LXC container to start and get IP
+  shell: "pct exec {{ lxc_vmid }} -- ip -4 addr show eth0 | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'"
+  register: lxc_ip
+  until: lxc_ip.stdout != ""
+  retries: 30
+  delay: 2
+  changed_when: false
+
+- name: Register LXC in Pi-hole DNS
+  command: >
+    pct exec 110 -- sh -c '
+    sed -i "/{{ lxc_hostname }}\.in\.s3ntin3l8\.de/d" /etc/hosts &&
+    sed -i "/ {{ lxc_hostname }}$/d" /etc/hosts &&
+    echo "{{ lxc_ip.stdout }} {{ lxc_hostname }}.in.s3ntin3l8.de {{ lxc_hostname }}" >> /etc/hosts &&
+    systemctl restart pihole-FTL
+    '
+  when: lxc_ip.stdout != ""
+  changed_when: true
+
+- name: Install bootstrap packages inside Alpine LXC for Ansible compatibility
+  command: "pct exec {{ lxc_vmid }} -- apk add {{ item }}"
+  loop: "{{ lxc_bootstrap_packages }}"
+  changed_when: true
+
+- name: Persistently add host to global inventory file
+  delegate_to: localhost
+  ansible.builtin.blockinfile:
+    path: "{{ inventory_file_path }}"
+    marker: "{{ inventory_marker }}"
+    insertafter: "{{ inventory_insert_after }}"
+    block: |
+      {{ ' ' * (inventory_indent_level | int) }}{{ lxc_hostname }}:
+      {{ ' ' * (inventory_indent_level | int + 2) }}ansible_host: {{ lxc_ip.stdout }}
+      {{ ' ' * (inventory_indent_level | int + 2) }}ansible_user: {{ inventory_user }}
+
+- name: Add new LXC to in-memory inventory
+  add_host:
+    name: "{{ lxc_hostname }}"
+    ansible_host: "{{ lxc_ip.stdout }}"
+    ansible_user: "{{ lxc_bootstrap_user }}"
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+  changed_when: false
+
+- name: Set facts for the new LXC
+  set_fact:
+    deployed_lxc_hostname: "{{ lxc_hostname }}"
+    deployed_lxc_ip: "{{ lxc_ip.stdout }}"
+
+- name: Cleanup temporary pubkey file
+  file:
+    path: "/tmp/lxc_pubkey.pub"
+    state: absent

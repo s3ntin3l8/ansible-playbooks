@@ -1,0 +1,12 @@
+---
+- name: Install Intel/AMD GPU drivers (Ubuntu/Debian)
+  apt:
+    name: [va-driver-all, mesa-va-drivers, intel-media-va-driver-non-free, libva-drm2, libva2]
+    state: present
+  when: ansible_os_family == "Debian" and gpu_type in ['intel', 'amd']
+
+- name: Install Intel/AMD GPU drivers (Alpine)
+  apk:
+    name: [mesa-va-gallium, libva-intel-driver, intel-media-driver]
+    state: present
+  when: ansible_os_family == "Alpine" and gpu_type in ['intel', 'amd']

@@ -1,0 +1,26 @@
+---
+# Proxmox VM settings
+template_id: 9000
+new_vmid: 400
+vm_name: "openclaw-vm"
+vm_cores: 4
+vm_memory: 8192
+vm_storage: "local-lvm"
+snippet_storage: "local"
+
+# Disk settings
+vm_disk_name: "scsi0"  # Adjust this if your template uses virtio0 or sata0
+vm_disk_size: "32G"    # Absolute size (e.g., 32G) or relative size (+10G)
+
+# Network settings
+network_iface: "eth0"
+network_bridge: "vmbr0"
+network_v4_dhcp: true
+network_v6_dhcp: true
+
+# Cloud-init settings
+ci_user: "ansible"
+ssh_public_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+
+# Proxmox tags
+vm_tags: "vm,ai,ubuntu"

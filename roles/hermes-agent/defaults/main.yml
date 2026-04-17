@@ -1,0 +1,9 @@
+---
+hermes_agent_repo: "https://github.com/NousResearch/hermes-agent.git"
+hermes_agent_version: "main"
+hermes_agent_install_dir: "{{ ansible_user_dir }}/hermes-agent"
+hermes_agent_config_dir: "{{ ansible_user_dir }}/.hermes"
+hermes_agent_bin_dir: "{{ ansible_user_dir }}/.local/bin"
+hermes_agent_python_version: "3.11"
+hermes_agent_extras: "[all]"
+hermes_agent_api_keys: {}

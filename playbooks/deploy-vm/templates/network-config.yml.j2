@@ -1,0 +1,5 @@
+version: 2
+ethernets:
+  {{ network_iface }}:
+    dhcp4: {{ network_v4_dhcp | lower }}
+    dhcp6: {{ network_v6_dhcp | lower }}

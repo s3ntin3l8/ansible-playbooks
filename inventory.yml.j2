@@ -1,0 +1,54 @@
+all:
+  vars:
+    lxc_type: core
+    lxc_index: 1
+  children:
+    proxmox:
+      hosts:
+        "{{ lookup('env', 'PROXMOX_HOST_IP') }}":
+      vars:
+        ansible_user: root
+    
+    tailscale_routers:
+      hosts:
+        tailscale-router:
+          ansible_host: "{{ lookup('env', 'TAILSCALE_ROUTER_IP') }}"
+          ansible_user: ansible
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+    managed_containers:
+      hosts:
+# BEGIN ANSIBLE MANAGED HOST - dev-01
+        dev-01:
+          ansible_host: "{{ lookup('env', 'DEV_01_IP') }}"
+          ansible_user: bjoern
+# END ANSIBLE MANAGED HOST - dev-01
+# BEGIN ANSIBLE MANAGED HOST - openclaw-01
+        openclaw-01:
+          ansible_host: "{{ lookup('env', 'OPENCLAW_01_IP') }}"
+          ansible_user: bjoern
+# END ANSIBLE MANAGED HOST - openclaw-01
+
+    management:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_user: bjoern
+
+    docker_hosts:
+      hosts:
+        dockerhost:
+          ansible_user: bjoern
+          # Using bjoern as requested, matching your pre-ansible setup
+
+    pihole_hosts:
+      hosts:
+        pihole_lxc:
+          ansible_host: "{{ lookup('env', 'PIHOLE_LXC_IP') }}"
+          ansible_user: root
+        pihole_zero:
+          ansible_host: "{{ lookup('env', 'PIHOLE_ZERO_IP') }}"
+          ansible_user: pi
+
+    k3s_hosts:
+      hosts: {}

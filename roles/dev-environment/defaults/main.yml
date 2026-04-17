@@ -1,0 +1,18 @@
+---
+dev_env_packages_debian:
+  - zsh
+  - build-essential
+  - python3-pip
+  - python3-venv
+  - git
+  - gh
+
+dev_env_packages_alpine:
+  - zsh
+  - build-base
+  - python3
+  - py3-pip
+  - nodejs
+  - npm
+  - git
+  - github-cli

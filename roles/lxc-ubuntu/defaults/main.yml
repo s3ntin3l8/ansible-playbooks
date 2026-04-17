@@ -1,0 +1,31 @@
+---
+# LXC Hardware configuration
+lxc_storage: local-lvm
+lxc_cores: 1
+lxc_memory: 1024
+lxc_disk_size: 8G
+
+# Networking
+lxc_bridge: vmbr0
+lxc_ip4: dhcp
+lxc_ip6: dhcp
+lxc_net: "name=eth0,bridge={{ lxc_bridge }},ip={{ lxc_ip4 }},ip6={{ lxc_ip6 }}"
+
+# Initial bootstrap keys (for root)
+lxc_pubkey_file: "~/.ssh/id_rsa.pub"
+github_username: "s3ntin3l8"
+
+# Path to the inventory file to update
+inventory_file_path: "{{ inventory_dir }}/inventory.yml"
+inventory_marker: "# {mark} ANSIBLE MANAGED HOST - {{ lxc_hostname }}"
+inventory_insert_after: "managed_containers:\\s+hosts:"
+inventory_indent_level: 8
+
+# The user for in-memory add_host (should be root for initial bootstrap)
+lxc_bootstrap_user: root
+
+# The user to write to the inventory file (permanent user)
+inventory_user: bjoern
+
+# Extra LXC configuration (e.g. for Tailscale TUN/TAP)
+lxc_extra_config: ""

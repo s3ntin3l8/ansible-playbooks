@@ -1,0 +1,40 @@
+# Ansible
+*.retry
+*.log
+*.tmp
+.vault_pass.txt
+~/.vault_pass.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+bin/
+build/
+develop-eggs/
+dist/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+.history/
+.env
+proxmox.yml
+inventory.yml
