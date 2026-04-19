@@ -1,0 +1,25 @@
+---
+- name: Update Pi-hole (v6)
+  hosts: pihole_hosts
+  become: true
+
+  tasks:
+    - name: Check if Pi-hole is installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/pihole
+      register: pihole_binary
+
+    - name: Run Pi-hole update
+      ansible.builtin.command:
+        cmd: pihole -up
+      register: update_output
+      when: pihole_binary.stat.exists
+      changed_when: "'Update complete!' in update_output.stdout"
+      failed_when: 
+        - update_output.rc != 0
+        - "'Everything is up to date' not in update_output.stdout"
+
+    - name: Display update output
+      ansible.builtin.debug:
+        var: update_output.stdout_lines
+      when: update_output.stdout is defined

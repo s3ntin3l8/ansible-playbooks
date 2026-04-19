@@ -91,6 +91,7 @@ check: prepare
 	$(ANSIBLE) playbooks/deploy-k3s-lxc.yml --syntax-check
 	$(ANSIBLE) playbooks/deploy-dev-box.yml --syntax-check
 	$(ANSIBLE) playbooks/deploy-management-lxc.yml --syntax-check
+	$(ANSIBLE) playbooks/update-pihole.yml --syntax-check
 
 management: prepare
 	@echo "🚀 Deploying Management Apps..."
