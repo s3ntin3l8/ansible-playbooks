@@ -61,8 +61,12 @@ destroy: prepare
 	$(ANSIBLE) playbooks/destroy-lxc.yml -e lxc_vmid=$(id)
 
 pihole: prepare
-	@echo "🚀 Installing Pi-hole..."
-	$(ANSIBLE) playbooks/install-pihole.yml
+	@echo "🚀 Installing Pi-hole on Ubuntu..."
+	$(ANSIBLE) playbooks/pihole-ubuntu.yml
+
+pihole-alpine: prepare
+	@echo "🚀 Installing Pi-hole on Alpine..."
+	$(ANSIBLE) playbooks/pihole-alpine.yml
 
 k3s: prepare
 	@echo "🚀 Deploying K3s..."

@@ -1,0 +1,75 @@
+---
+- name: Deploy Pi-hole v6 on Alpine LXC
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    lxc_type: "pihole"
+    lxc_index: 2 # Assuming 1 is already taken by the existing pihole_lxc
+    lxc_memory: 512
+    lxc_cores: 1
+
+  roles:
+    - role: lxc-alpine
+
+- name: Install Pi-hole (Bare Metal / Alpine)
+  hosts: "{{ lxc_hostname | default('pihole_hosts') }}"
+  become: true
+
+  tasks:
+    - name: Install dependencies (Alpine)
+      ansible.builtin.apk:
+        name:
+          - curl
+          - git
+          - bash
+          - bind-tools # dnsutils equivalent
+          - iproute2
+          - libcap
+          - shadow
+          - sudo
+          - ca-certificates
+        state: present
+        update_cache: yes
+
+    - name: Ensure /etc/pihole exists
+      ansible.builtin.file:
+        path: /etc/pihole
+        state: directory
+        mode: '0755'
+
+    - name: Generate password hash
+      ansible.builtin.set_fact:
+        pihole_webpassword_hash: "{{ (pihole_admin_password | string | hash('sha256') | hash('sha256')) }}"
+      no_log: true
+
+    - name: Deploy pihole.toml configuration
+      ansible.builtin.template:
+        src: ../roles/pihole/templates/pihole.toml.j2
+        dest: /etc/pihole/pihole.toml
+        mode: '0644'
+
+    - name: Check if Pi-hole is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/pihole
+      register: pihole_binary
+
+    - name: Download Pi-hole installer
+      ansible.builtin.get_url:
+        url: https://install.pi-hole.net
+        dest: /tmp/basic-install.sh
+        mode: '0755'
+      when: not pihole_binary.stat.exists
+
+    - name: Run Pi-hole unattended installer
+      ansible.builtin.command:
+        cmd: /tmp/basic-install.sh --unattended
+      when: not pihole_binary.stat.exists
+      changed_when: true
+      environment:
+        PIHOLE_SKIP_OS_CHECK: "true" # Alpine might need this if not officially supported by script
+
+    - name: Ensure Pi-hole services are started and enabled
+      ansible.builtin.service:
+        name: pihole-FTL
+        state: started
+        enabled: true
