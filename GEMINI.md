@@ -6,7 +6,7 @@ This document provides foundational mandates and context for this workspace.
 
 - **Venv Execution:** All commands MUST run from the virtual environment: `~/ansible/venv`.
 - **Keyless Security:** NEVER store private SSH keys on this VM. Use **SSH Agent Forwarding** (via 1Password) from your local machine.
-- **Identity-First:** Perform all operations as user `bjoern`. Use the `ansible` user only for automation/service identity.
+- **Identity-First:** Perform all operations as the primary user (default: `bjoern`). Use the `ansible` user only for automation/service identity.
 - **Global Config:** Always use the root `ansible.cfg` and `inventory.yml`. Do not create local inventory files in playbook directories.
 
 ## Workspace Context
@@ -14,7 +14,7 @@ This document provides foundational mandates and context for this workspace.
 - **Proxmox Host:** Target host is defined in `.env` as `PROXMOX_HOST_IP`.
 - **Identity Provisioning:** Every deployment (LXC/VM) must provision:
     - `ansible`: For automated management (passwordless sudo).
-    - `bjoern`: For personal access (passwordless sudo, GitHub keys).
+    - Primary User: For personal access (passwordless sudo, GitHub keys).
 - **Docker Support:** LXC containers require `nesting=1,keyctl=1` and `unprivileged=1`.
 
 ## Configuration Logic (Obfuscation)

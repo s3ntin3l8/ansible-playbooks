@@ -27,7 +27,7 @@ inventory_indent_level: 8
 lxc_bootstrap_user: root
 
 # The user to write to the inventory file (permanent user)
-inventory_user: bjoern
+inventory_user: "{{ primary_user | default('bjoern') }}"
 
 # Packages to install immediately after creation (using pct exec)
 lxc_bootstrap_packages:

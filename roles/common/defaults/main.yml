@@ -1,9 +1,14 @@
 ---
 # Baseline user configuration
 ansible_uid: 1001
-bjoern_uid: 1000
+primary_user: "{{ lookup('env', 'PRIMARY_USER') | default('bjoern', true) }}"
+primary_user_uid: 1000
+primary_user_pubkey: "{{ lookup('env', 'PRIMARY_USER_SSH_PUBKEY') | default('', true) }}"
 ansible_pubkey: "{{ lookup('env', 'ANSIBLE_SSH_PUBKEY') }}"
 github_username: "{{ lookup('env', 'GITHUB_USERNAME') }}"
+git_user_name: "{{ lookup('env', 'GIT_USER_NAME') | default('Björn Hansen', true) }}"
+git_user_email: "{{ lookup('env', 'GIT_USER_EMAIL') | default('58235613+s3ntin3l8@users.noreply.github.com', true) }}"
+github_token: "{{ lookup('env', 'GITHUB_TOKEN') | default('', true) }}"
 
 # Essential packages for every server
 baseline_packages:

@@ -29,7 +29,7 @@
         update_cache: yes
   when: ansible_os_family == "Alpine"
 
-- name: Set Zsh as default shell for bjoern
+- name: Set Zsh as default shell for primary user
   user:
-    name: bjoern
+    name: "{{ primary_user }}"
     shell: /usr/bin/zsh

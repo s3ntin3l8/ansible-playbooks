@@ -21,24 +21,24 @@ all:
 # BEGIN ANSIBLE MANAGED HOST - dev-01
         dev-01:
           ansible_host: "{{ lookup('env', 'DEV_01_IP') }}"
-          ansible_user: bjoern
+          ansible_user: {{ lookup('env', 'PRIMARY_USER') | default('bjoern', true) }}
 # END ANSIBLE MANAGED HOST - dev-01
 # BEGIN ANSIBLE MANAGED HOST - openclaw-01
         openclaw-01:
           ansible_host: "{{ lookup('env', 'OPENCLAW_01_IP') }}"
-          ansible_user: bjoern
+          ansible_user: {{ lookup('env', 'PRIMARY_USER') | default('bjoern', true) }}
 # END ANSIBLE MANAGED HOST - openclaw-01
 
     management:
       hosts:
         localhost:
           ansible_connection: local
-          ansible_user: bjoern
+          ansible_user: {{ lookup('env', 'PRIMARY_USER') | default('bjoern', true) }}
 
     docker_hosts:
       hosts:
         dockerhost:
-          ansible_user: bjoern
+          ansible_user: {{ lookup('env', 'PRIMARY_USER') | default('bjoern', true) }}
           # Using bjoern as requested, matching your pre-ansible setup
 
     pihole_hosts:

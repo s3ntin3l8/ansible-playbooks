@@ -24,7 +24,7 @@
     - role: common
     - role: docker
       vars:
-        docker_user: bjoern
+        docker_user: "{{ primary_user }}"
     - role: ai-tools
 
   tasks:
@@ -36,33 +36,33 @@
         state: present
         update_cache: yes
 
-    - name: Ensure bjoern's home directory exists
+    - name: Ensure primary user's home directory exists
       ansible.builtin.file:
-        path: /home/bjoern/ansible
+        path: "/home/{{ primary_user }}/ansible"
         state: directory
-        owner: bjoern
-        group: bjoern
+        owner: "{{ primary_user }}"
+        group: "{{ primary_user }}"
         mode: '0755'
 
     - name: Create Python virtual environment for Ansible
       ansible.builtin.command:
-        cmd: python3 -m venv /home/bjoern/ansible/venv
-        creates: /home/bjoern/ansible/venv
-      become_user: bjoern
+        cmd: "python3 -m venv /home/{{ primary_user }}/ansible/venv"
+        creates: "/home/{{ primary_user }}/ansible/venv"
+      become_user: "{{ primary_user }}"
 
     - name: Install Ansible in virtual environment
       ansible.builtin.pip:
         name: 
           - ansible
           - ansible-core
-        virtualenv: /home/bjoern/ansible/venv
-      become_user: bjoern
+        virtualenv: "/home/{{ primary_user }}/ansible/venv"
+      become_user: "{{ primary_user }}"
 
     - name: Add alias for ansible in .zshrc
       ansible.builtin.lineinfile:
-        path: /home/bjoern/.zshrc
-        line: "alias ans='/home/bjoern/ansible/venv/bin/ansible-playbook'"
+        path: "/home/{{ primary_user }}/.zshrc"
+        line: "alias ans='/home/{{ primary_user }}/ansible/venv/bin/ansible-playbook'"
         create: yes
-        owner: bjoern
-        group: bjoern
+        owner: "{{ primary_user }}"
+        group: "{{ primary_user }}"
         mode: '0644'

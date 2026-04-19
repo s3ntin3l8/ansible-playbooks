@@ -26,7 +26,7 @@
         tailscale_enabled: true
         tailscale_authkey: "{{ vault_tailscale_authkey | default('') }}"
         openclaw_ssh_keys:
-          - "{{ lookup('env', 'BJOERN_SSH_PUBKEY') }}"
+          - "{{ lookup('env', 'PRIMARY_USER_SSH_PUBKEY') }}"
     - homebrew
 
   post_tasks:

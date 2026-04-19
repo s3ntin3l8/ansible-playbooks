@@ -82,35 +82,35 @@
     state: present
     key: "{{ ansible_pubkey }}"
 
-- name: Create bjoern user
+- name: Create primary user
   ansible.builtin.user:
-    name: bjoern
-    uid: "{{ bjoern_uid }}"
+    name: "{{ primary_user }}"
+    uid: "{{ primary_user_uid }}"
     groups: "{{ sudo_group }}"
     append: yes
     shell: /bin/bash
     create_home: yes
 
-- name: Allow bjoern to have passwordless sudo
+- name: Allow primary user to have passwordless sudo
   ansible.builtin.lineinfile:
-    path: /etc/sudoers.d/bjoern
+    path: "/etc/sudoers.d/{{ primary_user }}"
     state: present
     create: yes
     mode: '0440'
-    line: 'bjoern ALL=(ALL) NOPASSWD: ALL'
+    line: '{{ primary_user }} ALL=(ALL) NOPASSWD: ALL'
     validate: 'visudo -cf %s'
 
-- name: Fetch bjoern public keys from GitHub
+- name: Fetch primary user public keys from GitHub
   ansible.builtin.uri:
     url: "https://github.com/{{ github_username }}.keys"
     return_content: yes
-  register: bjoern_github_keys
+  register: primary_user_github_keys
 
-- name: Install bjoern public keys
+- name: Install primary user public keys
   ansible.builtin.authorized_key:
-    user: bjoern
+    user: "{{ primary_user }}"
     state: present
-    key: "{{ bjoern_github_keys.content }}"
+    key: "{{ primary_user_github_keys.content }}"
 
 - name: Ensure SSH password authentication is disabled
   lineinfile:
@@ -125,3 +125,26 @@
     regexp: '^#?PermitRootLogin'
     line: 'PermitRootLogin prohibit-password'
   notify: Restart SSH
+
+- name: Configure Git user name for primary user
+  become_user: "{{ primary_user }}"
+  community.general.git_config:
+    name: user.name
+    scope: global
+    value: "{{ git_user_name }}"
+  when: git_user_name | length > 0
+
+- name: Configure Git user email for primary user
+  become_user: "{{ primary_user }}"
+  community.general.git_config:
+    name: user.email
+    scope: global
+    value: "{{ git_user_email }}"
+  when: git_user_email | length > 0
+
+- name: Authenticate GitHub CLI for primary user
+  become_user: "{{ primary_user }}"
+  ansible.builtin.shell: |
+    echo "{{ github_token }}" | gh auth login --with-token
+  when: github_token | length > 0
+  changed_when: false

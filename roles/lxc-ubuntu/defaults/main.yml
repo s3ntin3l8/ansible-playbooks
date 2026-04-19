@@ -25,7 +25,7 @@ inventory_indent_level: 8
 lxc_bootstrap_user: root
 
 # The user to write to the inventory file (permanent user)
-inventory_user: bjoern
+inventory_user: "{{ primary_user | default('bjoern') }}"
 
 # Extra LXC configuration (e.g. for Tailscale TUN/TAP)
 lxc_extra_config: ""

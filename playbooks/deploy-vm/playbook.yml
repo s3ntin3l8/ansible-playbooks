@@ -109,7 +109,7 @@
           {{ ' ' * 4 }}hosts:
           {{ ' ' * 6 }}{{ vm_name }}:
           {{ ' ' * 8 }}ansible_host: {{ vm_ip_raw.stdout }}
-          {{ ' ' * 8 }}ansible_user: bjoern
+          {{ ' ' * 8 }}ansible_user: "{{ lookup('env', 'PRIMARY_USER') | default('bjoern', true) }}"
 
     - name: Add new VM to in-memory inventory for immediate use
       add_host:
@@ -128,37 +128,36 @@
       apt:
         update_cache: yes
         upgrade: dist
-        cache_valid_time: 3600
 
-    - name: Create bjoern user
+    - name: Create primary user
       ansible.builtin.user:
-        name: bjoern
-        uid: 1000
-        groups: sudo
+        name: "{{ primary_user }}"
+        uid: "{{ primary_user_uid }}"
+        groups: "{{ sudo_group }}"
         append: yes
         shell: /bin/bash
         create_home: yes
 
-    - name: Allow bjoern to have passwordless sudo
+    - name: Allow primary user to have passwordless sudo
       ansible.builtin.lineinfile:
-        path: /etc/sudoers.d/bjoern
+        path: "/etc/sudoers.d/{{ primary_user }}"
         state: present
         create: yes
         mode: '0440'
-        line: 'bjoern ALL=(ALL) NOPASSWD: ALL'
+        line: '{{ primary_user }} ALL=(ALL) NOPASSWD: ALL'
         validate: 'visudo -cf %s'
 
-    - name: Fetch bjoern public keys from GitHub
+    - name: Fetch primary user public keys from GitHub
       ansible.builtin.uri:
         url: "https://github.com/{{ github_username }}.keys"
         return_content: yes
-      register: bjoern_github_keys
+      register: primary_user_github_keys
 
-    - name: Install bjoern public keys
+    - name: Install primary user public keys
       ansible.builtin.authorized_key:
-        user: bjoern
+        user: "{{ primary_user }}"
         state: present
-        key: "{{ bjoern_github_keys.content }}"
+        key: "{{ primary_user_github_keys.content }}"
 
     - name: Ensure SSH password authentication is disabled
       lineinfile:

@@ -79,7 +79,7 @@ The `lxc_vmid` and `lxc_hostname` are automatically calculated based on the `lxc
 
 *   **Vault:** Sensitive data (API tokens, passwords) are encrypted in `vault.yml` files.
 *   **No Private Keys:** Private SSH keys are never stored on this VM; use agent forwarding.
-*   **User Identity:** Management operations use the `ansible` user, while personal access is configured for `bjoern`.
+*   **User Identity:** Management operations use the `ansible` user, while personal access is configured for the primary user (configured via `PRIMARY_USER` in `.env`).
 
 ## 📜 License
 

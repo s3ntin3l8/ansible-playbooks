@@ -30,7 +30,7 @@
         gpu_type: amd
     - role: docker
       vars:
-        docker_user: bjoern
+        docker_user: "{{ primary_user }}"
     # - role: rocm-tools
     - role: dev-environment
     - role: ai-tools
