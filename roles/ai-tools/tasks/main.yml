@@ -1,10 +1,11 @@
 ---
-- name: Install Node.js dependencies
+- name: Install system dependencies
   ansible.builtin.apt:
     name:
       - ca-certificates
       - curl
       - gnupg
+      - jq
     state: present
     update_cache: true
 

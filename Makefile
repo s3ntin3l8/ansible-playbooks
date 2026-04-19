@@ -1,4 +1,4 @@
-.PHONY: help lxc vm maint inv check list management destroy
+.PHONY: help lxc vm maint inv check list management destroy dev-box management-lxc
 
 # Variables
 VENV := ./venv/bin/activate
@@ -19,6 +19,7 @@ help:
 	@echo "  make prepare    - Render dynamic inventory from .env"
 	@echo "  make lxc        - Deploy a new Ubuntu LXC container"
 	@echo "  make vm         - Deploy a new Ubuntu VM from template"
+	@echo "  make management-lxc - Deploy a new Management LXC (Ubuntu, ID 100)"
 	@echo "  make destroy id=123 - Stop, destroy LXC and cleanup DNS/Inventory"
 	@echo "  make maint      - Run Proxmox host maintenance (updates, cleanup)"
 	@echo "  make inv        - Show dynamic/static inventory graph"
@@ -42,6 +43,10 @@ lxc: prepare
 dev-box: prepare
 	@echo "🚀 Deploying Dev Box..."
 	$(ANSIBLE) playbooks/deploy-dev-box.yml
+
+management-lxc: prepare
+	@echo "🚀 Deploying Management LXC..."
+	$(ANSIBLE) playbooks/deploy-management-lxc.yml
 
 alpine: prepare
 	@echo "🚀 Deploying Alpine LXC..."
@@ -85,6 +90,7 @@ check: prepare
 	$(ANSIBLE) playbooks/install-pihole.yml --syntax-check
 	$(ANSIBLE) playbooks/deploy-k3s-lxc.yml --syntax-check
 	$(ANSIBLE) playbooks/deploy-dev-box.yml --syntax-check
+	$(ANSIBLE) playbooks/deploy-management-lxc.yml --syntax-check
 
 management: prepare
 	@echo "🚀 Deploying Management Apps..."

@@ -1,0 +1,68 @@
+---
+- name: Provision Management LXC on Proxmox
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    lxc_vmid: 100
+    lxc_hostname: management
+    lxc_memory: 2048
+    lxc_cores: 2
+    lxc_disk_size: 20G
+    lxc_type: core
+  roles:
+    - role: lxc-ubuntu
+
+- name: Configure Management LXC
+  hosts: management
+  remote_user: root
+  become: yes
+  pre_tasks:
+    - name: Wait for connection
+      wait_for_connection:
+        timeout: 60
+  roles:
+    - role: common
+    - role: docker
+      vars:
+        docker_user: bjoern
+    - role: ai-tools
+
+  tasks:
+    - name: Install python3-venv and python3-pip
+      ansible.builtin.apt:
+        name:
+          - python3-venv
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Ensure bjoern's home directory exists
+      ansible.builtin.file:
+        path: /home/bjoern/ansible
+        state: directory
+        owner: bjoern
+        group: bjoern
+        mode: '0755'
+
+    - name: Create Python virtual environment for Ansible
+      ansible.builtin.command:
+        cmd: python3 -m venv /home/bjoern/ansible/venv
+        creates: /home/bjoern/ansible/venv
+      become_user: bjoern
+
+    - name: Install Ansible in virtual environment
+      ansible.builtin.pip:
+        name: 
+          - ansible
+          - ansible-core
+        virtualenv: /home/bjoern/ansible/venv
+      become_user: bjoern
+
+    - name: Add alias for ansible in .zshrc
+      ansible.builtin.lineinfile:
+        path: /home/bjoern/.zshrc
+        line: "alias ans='/home/bjoern/ansible/venv/bin/ansible-playbook'"
+        create: yes
+        owner: bjoern
+        group: bjoern
+        mode: '0644'

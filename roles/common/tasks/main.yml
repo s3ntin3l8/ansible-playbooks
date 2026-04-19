@@ -1,6 +1,24 @@
 ---
 - name: OS-specific setup (Debian/Ubuntu)
   block:
+    - name: Ensure keyring directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download GitHub CLI GPG key
+      ansible.builtin.get_url:
+        url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+        dest: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+        mode: '0644'
+
+    - name: Add GitHub CLI apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+        state: present
+        filename: github-cli
+
     - name: Update apt cache and upgrade all packages
       apt:
         update_cache: yes
@@ -9,7 +27,7 @@
 
     - name: Install baseline packages (Debian)
       apt:
-        name: "{{ baseline_packages + ['unattended-upgrades', 'dnsutils'] }}"
+        name: "{{ baseline_packages + ['unattended-upgrades', 'dnsutils', 'gh'] }}"
         state: present
 
     - name: Set sudo group name (Debian)
@@ -19,6 +37,12 @@
 
 - name: OS-specific setup (Alpine)
   block:
+    - name: Ensure community repository is enabled
+      ansible.builtin.lineinfile:
+        path: /etc/apk/repositories
+        line: "http://dl-cdn.alpinelinux.org/alpine/latest-stable/community"
+        state: present
+
     - name: Update apk cache and upgrade all packages
       apk:
         update_cache: yes
@@ -26,7 +50,7 @@
 
     - name: Install baseline packages (Alpine)
       apk:
-        name: "{{ baseline_packages + ['sudo', 'bind-tools'] }}"
+        name: "{{ baseline_packages + ['sudo', 'bind-tools', 'github-cli'] }}"
         state: present
 
     - name: Set sudo group name (Alpine)
