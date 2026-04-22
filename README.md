@@ -34,14 +34,13 @@ All common operations are handled through the `Makefile` for simplicity.
 # Display available commands
 make help
 
-# Provision a new LXC container
-make lxc
-
-# Provision a new VM from template
-make vm
-
 # Run host maintenance
 make maint
+
+# Deploy specialized boxes
+make dev-box
+make management-lxc
+make f1-timing
 
 # Check inventory
 make inv
@@ -56,6 +55,8 @@ The environment uses a centralized naming and numbering scheme for LXC container
 | `core` | 101+ | `core` | Infrastructure (Pi-hole, Tailscale, etc.) |
 | `docker` | 301+ | `docker` | Docker container hosts |
 | `k3s` | 401+ | `k3s` | Kubernetes nodes |
+| `dev` | 501+ | `dev` | Development boxes |
+| `openclaw` | 601+ | `openclaw` | OpenClaw application nodes |
 | `generic` | 901+ | `lxc` | Temporary or test containers |
 
 ### Usage
@@ -76,7 +77,10 @@ The `lxc_vmid` and `lxc_hostname` are automatically calculated based on the `lxc
     *   `lxc-ubuntu/` - Ubuntu LXC provisioning logic.
     *   `lxc-alpine/` - Alpine LXC provisioning logic.
     *   `deploy-vm/` - VM provisioning logic.
-    *   `deploy-openclaw/` - (Sub-repository) OpenClaw installer.
+    *   `deploy-openclaw/` - OpenClaw installer.
+    *   `deploy-f1-timing.yml` - F1 Replay Timing app deployment.
+    *   `deploy-management-lxc.yml` - Infrastructure management container.
+    *   `backup-pihole.yml` - Pi-hole configuration backup.
 *   `roles/` - Shared Ansible roles.
 *   `group_vars/` - Variable definitions (including encrypted secrets).
 *   `assets/` - Brand assets and logos.
