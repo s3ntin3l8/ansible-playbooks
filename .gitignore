@@ -38,3 +38,4 @@ var/
 .env
 proxmox.yml
 inventory.yml
+backups/

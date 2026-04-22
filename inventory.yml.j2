@@ -38,8 +38,7 @@ all:
     docker_hosts:
       hosts:
         dockerhost:
-          ansible_user: {{ lookup('env', 'PRIMARY_USER') | default('bjoern', true) }}
-          # Using bjoern as requested, matching your pre-ansible setup
+          ansible_user: root
 
     pihole_hosts:
       hosts:

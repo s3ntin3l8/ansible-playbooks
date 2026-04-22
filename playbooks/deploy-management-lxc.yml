@@ -3,9 +3,9 @@
   hosts: proxmox
   gather_facts: no
   vars:
-    lxc_vmid: 100
-    lxc_hostname: management
-    lxc_memory: 2048
+    lxc_vmid: 101
+    lxc_hostname: mgmt
+    lxc_memory: 4096
     lxc_cores: 2
     lxc_disk_size: 20G
     lxc_type: core

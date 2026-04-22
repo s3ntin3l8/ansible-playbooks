@@ -1,0 +1,15 @@
+# ![S3ntin3l8 Logo](https://raw.githubusercontent.com/{{ github_username | default('s3ntin3l8') }}/ansible-playbooks/main/assets/logo.png)
+
+```text
+   _____ _________  _____________________   _______ __ 
+  / ___/|__  / __ \/ ____/ __ \/  _/ | / /  / /_  // /_
+  \__ \  /_ < / / / __/ / / / // //  |/ /  / / / / / __ \
+ ___/ /___/ / /_/ / /___/ /_/ // // /|  /  / / / / / /_/ /
+/____//____/_____/_____/_/ |_/___/_/ |_/  /_/ /_/ /_.___/ 
+```
+
+**Deployment Summary:**
+- **Hostname:** {{ lxc_hostname }}
+- **Type:** {{ lxc_type | default('generic') | upper }}
+- **Provisioner:** Ansible
+- **Deployed:** {{ lookup('pipe', 'date "+%Y-%m-%d %H:%M:%S"') }}

@@ -29,6 +29,7 @@ help:
 	@echo "  make pihole     - Install Pi-hole v6 (Bare Metal)"
 	@echo "  make k3s        - Deploy K3s on Proxmox LXC"
 	@echo "  make alpine     - Deploy a new Alpine LXC container"
+	@echo "  make f1-timing  - Deploy F1 Replay Timing application"
 
 prepare:
 	@if [ ! -f .env ]; then echo "Error: .env file missing. Copy .env.example to .env and fill in your values."; exit 1; fi
@@ -51,6 +52,10 @@ management-lxc: prepare
 alpine: prepare
 	@echo "🚀 Deploying Alpine LXC..."
 	$(ANSIBLE) playbooks/lxc-alpine/playbook.yml
+
+f1-timing: prepare
+	@echo "🚀 Deploying F1 Replay Timing..."
+	$(ANSIBLE) playbooks/deploy-f1-timing.yml
 
 destroy: prepare
 	@if [ -z "$(id)" ]; then \
