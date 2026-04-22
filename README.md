@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" width="200" alt="S3ntin3l8 Logo">
+</p>
+
 # Ansible Infrastructure - Proxmox & OpenClaw
 
 Automated management and deployment playbooks for a Proxmox-based infrastructure, including LXC/VM provisioning and OpenClaw application deployment.
@@ -13,6 +17,7 @@ This repository contains the foundational Ansible playbooks and configuration fo
 *   **Maintenance:** Automated host maintenance (updates, cleanup) for the Proxmox host.
 *   **OpenClaw Deployment:** Specialized playbooks for deploying the [OpenClaw](https://github.com/openclaw/openclaw) project.
 *   **Tailscale Integration:** Support for Tailscale VPN deployment.
+*   **Proxmox Branding:** Automated "Notes" generation with branding and deployment metadata for all new containers.
 
 ## 🛠️ Prerequisites
 
@@ -74,6 +79,7 @@ The `lxc_vmid` and `lxc_hostname` are automatically calculated based on the `lxc
     *   `deploy-openclaw/` - (Sub-repository) OpenClaw installer.
 *   `roles/` - Shared Ansible roles.
 *   `group_vars/` - Variable definitions (including encrypted secrets).
+*   `assets/` - Brand assets and logos.
 
 ## 🔒 Security
 
