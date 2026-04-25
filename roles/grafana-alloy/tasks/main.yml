@@ -1,0 +1,86 @@
+- name: Determine deployment mode
+  ansible.builtin.set_fact:
+    # Prefer 'package' (systemd) for Proxmox and LXCs to ensure full system visibility.
+    # Use 'docker' only on dedicated docker hosts or if explicitly requested.
+    alloy_mode: >-
+      {{ 
+        'docker' if (alloy_deployment_preference | default('') == 'docker') 
+        or (ansible_virtualization_type | default('') != 'lxc' and 'proxmox' not in group_names and docker_installed | default(false)) 
+        else 'package' 
+      }}
+
+- name: Deploy Alloy via Package (Systemd)
+  block:
+    - name: Install dependencies
+      ansible.builtin.apt:
+        name: [gpg, curl]
+        state: present
+
+    - name: Add Grafana GPG key
+      ansible.builtin.apt_key:
+        url: https://apt.grafana.com/gpg.key
+        state: present
+
+    - name: Add Grafana repository
+      ansible.builtin.apt_repository:
+        repo: "deb https://apt.grafana.com stable main"
+        state: present
+
+    - name: Install Alloy
+      ansible.builtin.apt:
+        name: alloy
+        state: present
+
+    - name: Template Alloy configuration
+      ansible.builtin.template:
+        src: config.alloy.j2
+        dest: /etc/alloy/config.alloy
+        mode: '0644'
+      notify: restart alloy
+
+    - name: Ensure Alloy is started and enabled
+      ansible.builtin.systemd:
+        name: alloy
+        state: started
+        enabled: yes
+  when: alloy_mode == 'package'
+
+- name: Deploy Alloy via Docker
+  block:
+    - name: Create Alloy configuration directory
+      ansible.builtin.file:
+        path: "/etc/alloy"
+        state: directory
+        mode: '0755'
+
+    - name: Template Alloy configuration
+      ansible.builtin.template:
+        src: config.alloy.j2
+        dest: /etc/alloy/config.alloy
+        mode: '0644'
+
+    - name: Run Alloy container
+      community.docker.docker_container:
+        name: alloy
+        image: grafana/alloy:latest
+        state: started
+        restart_policy: always
+        volumes:
+          - /etc/alloy/config.alloy:/etc/alloy/config.alloy
+          - /var/run/docker.sock:/var/run/docker.sock
+          - /var/log:/var/log:ro
+          - /:/host:ro
+        command: ["run", "--server.http.listen-addr=0.0.0.0:12345", "/etc/alloy/config.alloy"]
+        network_mode: host
+  when: alloy_mode == 'docker'
+
+- name: Append 'monitoring' tag to Proxmox LXC
+  delegate_to: proxmox
+  ansible.builtin.shell: |
+    EXISTING_TAGS=$(pct config {{ proxmox_vmid }} | grep '^tags:' | awk '{print $2}')
+    if [[ "$EXISTING_TAGS" != *"monitoring"* ]]; then
+      NEW_TAGS="${EXISTING_TAGS}${EXISTING_TAGS:+;}monitoring"
+      pct set {{ proxmox_vmid }} --tags "$NEW_TAGS"
+    fi
+  when: proxmox_vmid is defined
+  changed_when: true

@@ -1,0 +1,29 @@
+---
+observability_hub_path: "{{ docker_apps_path }}/observability"
+grafana_port: 3000
+prometheus_port: 9090
+loki_port: 3100
+blackbox_exporter_port: 9115
+alertmanager_port: 9093
+gatus_port: 8081
+
+grafana_image: grafana/grafana:latest
+prometheus_image: prom/prometheus:latest
+loki_image: grafana/loki:latest
+blackbox_image: prom/blackbox-exporter:latest
+alertmanager_image: prom/alertmanager:latest
+gatus_image: twin/gatus:latest
+pve_exporter_image: prompve/prometheus-pve-exporter:latest
+pihole_exporter_image: ekojs/pihole-exporter:latest
+
+# Ports
+pve_exporter_port: 9221
+pihole_exporter_port: 9617
+
+# Domains
+grafana_subdomain: "grafana"
+loki_subdomain: "loki"
+gatus_subdomain: "status"
+
+# External Hosts
+unraid_ip: "192.168.2.1"

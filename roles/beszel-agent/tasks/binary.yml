@@ -1,0 +1,40 @@
+---
+- name: Create beszel user
+  ansible.builtin.user:
+    name: beszel
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+
+- name: Create installation directory
+  ansible.builtin.file:
+    path: /opt/beszel-agent
+    state: directory
+    owner: beszel
+    group: beszel
+    mode: '0755'
+
+- name: Download Beszel Agent binary
+  ansible.builtin.get_url:
+    url: "https://github.com/henrygd/beszel/releases/latest/download/beszel-agent_linux_{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+    dest: /opt/beszel-agent/beszel-agent
+    owner: beszel
+    group: beszel
+    mode: '0755'
+  notify: Restart Beszel Agent
+
+- name: Create systemd service for Beszel Agent
+  ansible.builtin.template:
+    src: beszel-agent.service.j2
+    dest: /etc/systemd/system/beszel-agent.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Beszel Agent
+
+- name: Enable and start Beszel Agent service
+  ansible.builtin.systemd:
+    name: beszel-agent
+    enabled: yes
+    state: started
+    daemon_reload: yes

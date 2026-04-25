@@ -54,3 +54,14 @@
   delay: 5
   changed_when: false
   when: k3s_type == 'server'
+
+- name: Append 'k3s' tag to Proxmox LXC
+  delegate_to: proxmox
+  ansible.builtin.shell: |
+    EXISTING_TAGS=$(pct config {{ proxmox_vmid }} | grep '^tags:' | awk '{print $2}')
+    if [[ "$EXISTING_TAGS" != *"k3s"* ]]; then
+      NEW_TAGS="${EXISTING_TAGS}${EXISTING_TAGS:+;}k3s"
+      pct set {{ proxmox_vmid }} --tags "$NEW_TAGS"
+    fi
+  when: proxmox_vmid is defined
+  changed_when: true

@@ -1,0 +1,7 @@
+---
+alloy_version: "1.0.0"
+loki_url: "http://{{ hostvars[groups['docker_hosts'][0]]['ansible_host'] }}:3100/loki/api/v1/push"
+prometheus_url: "http://{{ hostvars[groups['docker_hosts'][0]]['ansible_host'] }}:9090/api/v1/write"
+
+# Alloy listen port
+alloy_listen_port: 12345

@@ -1,0 +1,67 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: {{ traefik_dashboard_enabled | lower }}
+  insecure: true
+
+log:
+  level: INFO
+
+entryPoints:
+  web:
+    address: ":80"
+{% if not traefik_is_gateway %}
+    forwardedHeaders:
+      trustedIPs:
+{% for ip in traefik_trusted_ips %}
+        - "{{ ip }}"
+{% endfor %}
+{% endif %}
+{% if traefik_is_gateway %}
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: cloudflare
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+{% endif %}
+
+providers:
+{% if traefik_is_gateway %}
+  file:
+    filename: "{{ traefik_config_path }}/dynamic_gateway.yml"
+    watch: true
+{% else %}
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: bridge
+{% endif %}
+
+{% if traefik_is_gateway %}
+certificatesResolvers:
+  cloudflare:
+    acme:
+      email: "{{ traefik_cf_email }}"
+      storage: "{{ traefik_config_path }}/acme.json"
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+{% endif %}
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true
+
+entryPoints:
+  metrics:
+    address: ":8080"

@@ -3,5 +3,8 @@ docker_apps_path: "/opt/docker-apps"
 uptime_kuma_port: 3001
 netbox_port: 8000
 
+# Networking: Use the dedicated bridge (eno1) for Docker hosts
+lxc_bridge: vmbr1
+
 # Traefik configuration (assuming a provider named 'proxy' or similar exists)
 traefik_domain: "{{ lookup('env', 'TRAEFIK_INTERNAL_DOMAIN') }}"

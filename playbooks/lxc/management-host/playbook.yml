@@ -1,0 +1,137 @@
+---
+- name: Provision Management LXC on Proxmox
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    lxc_vmid: 101
+    lxc_hostname: mgmt
+    lxc_memory: 4096
+    lxc_cores: 2
+    lxc_disk_size: 20G
+    lxc_type: core
+  roles:
+    - role: lxc-ubuntu
+
+- name: Configure Management LXC
+  hosts: management
+  remote_user: root
+  become: yes
+  pre_tasks:
+    - name: Wait for connection
+      wait_for_connection:
+        timeout: 60
+  roles:
+    - role: common
+    - role: docker
+      vars:
+        docker_user: "{{ primary_user }}"
+    - role: ai-tools
+    - role: observability-hub
+    - role: beszel-agent
+    - role: grafana-alloy
+
+  tasks:
+    - name: Create base directory for Docker apps
+      ansible.builtin.file:
+        path: "{{ docker_apps_path | default('/opt/docker-apps') }}"
+        state: directory
+        mode: '0755'
+
+    - name: Deploy Beszel Hub
+      block:
+        - name: Create Beszel Hub data directory
+          ansible.builtin.file:
+            path: "{{ docker_apps_path | default('/opt/docker-apps') }}/beszel-hub"
+            state: directory
+            mode: '0755'
+
+        - name: Run Beszel Hub container
+          community.docker.docker_container:
+            name: beszel-hub
+            image: henrygd/beszel:latest
+            state: started
+            restart_policy: always
+            published_ports:
+              - "{{ beszel_hub_port | default(8090) }}:8090"
+            volumes:
+              - "{{ docker_apps_path | default('/opt/docker-apps') }}/beszel-hub:/beszel_data"
+            labels:
+              traefik.enable: "true"
+              traefik.http.routers.beszel.rule: "Host(`beszel.{{ traefik_domain }}`)"
+              traefik.http.routers.beszel.entrypoints: "web"
+              traefik.http.services.beszel.loadbalancer.server.port: "8090"
+
+    - name: Deploy NetBox
+      block:
+        - name: Create NetBox directory
+          ansible.builtin.file:
+            path: "{{ docker_apps_path | default('/opt/docker-apps') }}/netbox"
+            state: directory
+            mode: '0755'
+
+        - name: Clone NetBox Docker repository
+          ansible.builtin.git:
+            repo: https://github.com/netbox-community/netbox-docker.git
+            dest: "{{ docker_apps_path | default('/opt/docker-apps') }}/netbox"
+            version: release
+            force: true
+
+        - name: Create docker-compose.override.yml for NetBox
+          ansible.builtin.copy:
+            dest: "{{ docker_apps_path | default('/opt/docker-apps') }}/netbox/docker-compose.override.yml"
+            content: |
+              services:
+                netbox:
+                  ports:
+                    - "8000:8080"
+                  labels:
+                    traefik.enable: "true"
+                    traefik.http.routers.netbox.rule: "Host(`netbox.{{ traefik_domain }}`)"
+                    traefik.http.routers.netbox.entrypoints: "web"
+                    traefik.http.services.netbox.loadbalancer.server.port: "8080"
+            mode: '0644'
+
+        - name: Start NetBox via Docker Compose
+          ansible.builtin.command:
+            cmd: docker compose up -d
+            chdir: "{{ docker_apps_path | default('/opt/docker-apps') }}/netbox"
+          changed_when: false
+
+    - name: Install python3-venv and python3-pip
+      ansible.builtin.apt:
+        name:
+          - python3-venv
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Ensure primary user's home directory exists
+      ansible.builtin.file:
+        path: "/home/{{ primary_user }}/ansible"
+        state: directory
+        owner: "{{ primary_user }}"
+        group: "{{ primary_user }}"
+        mode: '0755'
+
+    - name: Create Python virtual environment for Ansible
+      ansible.builtin.command:
+        cmd: "python3 -m venv /home/{{ primary_user }}/ansible/venv"
+        creates: "/home/{{ primary_user }}/ansible/venv"
+      become_user: "{{ primary_user }}"
+
+    - name: Install Ansible in virtual environment
+      ansible.builtin.pip:
+        name: 
+          - ansible
+          - ansible-core
+        virtualenv: "/home/{{ primary_user }}/ansible/venv"
+      become_user: "{{ primary_user }}"
+
+    - name: Add alias for ansible in .zshrc
+      ansible.builtin.lineinfile:
+        path: "/home/{{ primary_user }}/.zshrc"
+        line: "alias ans='/home/{{ primary_user }}/ansible/venv/bin/ansible-playbook'"
+        create: yes
+        owner: "{{ primary_user }}"
+        group: "{{ primary_user }}"
+        mode: '0644'

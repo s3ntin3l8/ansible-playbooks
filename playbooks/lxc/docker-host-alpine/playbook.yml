@@ -1,0 +1,33 @@
+---
+- name: Provision Alpine Docker Host LXC on Proxmox
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    lxc_type: docker
+    lxc_index: "{{ lxc_index | default(1) }}"
+    lxc_memory: 2048
+    lxc_cores: 2
+    lxc_disk_size: 20G
+  roles:
+    - role: lxc-alpine
+
+- name: Configure Alpine Docker Host
+  hosts: "{{ deployed_lxc_hostname | default('managed_containers') }}"
+  remote_user: root
+  become: yes
+  pre_tasks:
+    - name: Wait for connection
+      wait_for_connection:
+        timeout: 60
+  roles:
+    - role: common
+    - role: docker
+      vars:
+        docker_user: "{{ primary_user }}"
+    - role: traefik
+      vars:
+        traefik_is_gateway: false
+        traefik_gateway_ip: "{{ hostvars['traefik-gateway'].ansible_host | default('192.168.1.100') }}"
+    - role: pihole-dns-sync
+    - role: beszel-agent
+    - role: grafana-alloy

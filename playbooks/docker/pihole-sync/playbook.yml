@@ -1,0 +1,6 @@
+---
+- name: Deploy Pi-hole DNS Sync Service
+  hosts: docker_hosts
+  become: true
+  roles:
+    - pihole-dns-sync

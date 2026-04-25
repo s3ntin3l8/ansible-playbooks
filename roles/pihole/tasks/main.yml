@@ -52,3 +52,14 @@
     name: pihole-FTL
     state: started
     enabled: true
+
+- name: Append 'pihole' tag to Proxmox LXC
+  delegate_to: proxmox
+  ansible.builtin.shell: |
+    EXISTING_TAGS=$(pct config {{ proxmox_vmid }} | grep '^tags:' | awk '{print $2}')
+    if [[ "$EXISTING_TAGS" != *"pihole"* ]]; then
+      NEW_TAGS="${EXISTING_TAGS}${EXISTING_TAGS:+;}pihole"
+      pct set {{ proxmox_vmid }} --tags "$NEW_TAGS"
+    fi
+  when: proxmox_vmid is defined
+  changed_when: true

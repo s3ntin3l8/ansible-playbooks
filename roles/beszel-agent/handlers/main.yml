@@ -1,0 +1,7 @@
+---
+- name: Restart Beszel Agent
+  ansible.builtin.systemd:
+    name: beszel-agent
+    state: restarted
+    daemon_reload: yes
+  when: beszel_agent_mode == 'binary'

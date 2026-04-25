@@ -6,6 +6,7 @@ lxc_storage: local-lvm
 lxc_cores: 1
 lxc_memory: 512
 lxc_disk_size: 4G
+lxc_tags: "ansible;alpine;{{ lxc_env }}"
 
 # Networking
 lxc_bridge: vmbr0

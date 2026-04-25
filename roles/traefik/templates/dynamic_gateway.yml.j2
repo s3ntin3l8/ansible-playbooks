@@ -1,0 +1,27 @@
+http:
+  routers:
+{% for host in groups['docker_hosts'] | default([]) %}
+    to-{{ host }}:
+      rule: "HostRegexp(`{subdomain:[a-z0-9-]+}.{{ host }}.{{ traefik_domain }}`)"
+      entryPoints:
+        - websecure
+      service: {{ host }}-service
+      tls:
+        certResolver: cloudflare
+
+    to-{{ host }}-direct:
+      rule: "Host(`{{ host }}.{{ traefik_domain }}`)"
+      entryPoints:
+        - websecure
+      service: {{ host }}-service
+      tls:
+        certResolver: cloudflare
+{% endfor %}
+
+  services:
+{% for host in groups['docker_hosts'] | default([]) %}
+    {{ host }}-service:
+      loadBalancer:
+        servers:
+          - url: "http://{{ hostvars[host].ansible_host }}:80"
+{% endfor %}

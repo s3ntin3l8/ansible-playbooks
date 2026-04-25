@@ -1,0 +1,32 @@
+---
+- name: Provision Traefik Gateway LXC
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    lxc_type: core
+    lxc_index: 99 # Using a high index for the gateway
+    lxc_hostname: "traefik-gateway"
+    lxc_memory: 1024
+    lxc_cores: 1
+    lxc_disk_size: 10G
+  roles:
+    - role: lxc-alpine
+
+- name: Configure Traefik Gateway
+  hosts: traefik-gateway
+  remote_user: root
+  become: yes
+  pre_tasks:
+    - name: Wait for connection
+      wait_for_connection:
+        timeout: 60
+  roles:
+    - role: common
+    - role: docker
+      vars:
+        docker_user: root
+    - role: traefik
+      vars:
+        traefik_is_gateway: true
+        traefik_dashboard_enabled: true
+    - role: pihole-dns-sync

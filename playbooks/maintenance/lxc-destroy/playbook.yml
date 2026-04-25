@@ -1,0 +1,69 @@
+---
+- name: Destroy LXC Container and cleanup
+  hosts: proxmox
+  gather_facts: false
+  tasks:
+    - name: Ensure lxc_vmid is provided
+      ansible.builtin.fail:
+        msg: "You must provide lxc_vmid. Example: ansible-playbook playbooks/maintenance/lxc-destroy/playbook.yml -e lxc_vmid=123"
+      when: lxc_vmid is not defined
+
+    - name: Get LXC container configuration
+      ansible.builtin.command: "pct config {{ lxc_vmid }}"
+      register: lxc_config
+      changed_when: false
+      failed_when: false
+
+    - name: Check if container exists
+      ansible.builtin.fail:
+        msg: "Container {{ lxc_vmid }} does not exist on this Proxmox host."
+      when: lxc_config.rc != 0
+
+    - name: Extract hostname from config
+      ansible.builtin.set_fact:
+        lxc_hostname: "{{ lxc_config.stdout | regex_search('^hostname:\\s*(.*)$', '\\1', multiline=True) | first }}"
+
+    - name: Confirm destruction
+      ansible.builtin.pause:
+        prompt: "WARNING: You are about to permanently destroy LXC {{ lxc_vmid }} ({{ lxc_hostname }}). Type 'yes' to continue"
+      register: confirmation
+
+    - name: Abort if not confirmed
+      ansible.builtin.fail:
+        msg: "Destruction aborted by user."
+      when: confirmation.user_input | lower != 'yes'
+
+    - name: Stop the container if running
+      ansible.builtin.command: "pct stop {{ lxc_vmid }}"
+      register: stop_result
+      failed_when: false
+      changed_when: "'stopped' not in stop_result.stdout"
+
+    - name: Wait for container to stop
+      ansible.builtin.command: "pct status {{ lxc_vmid }}"
+      register: status_result
+      until: "'stopped' in status_result.stdout"
+      retries: 10
+      delay: 2
+      changed_when: false
+
+    - name: Destroy the container
+      ansible.builtin.command: "pct destroy {{ lxc_vmid }}"
+      changed_when: true
+
+    - name: Remove from Pi-hole local DNS
+      ansible.builtin.command: >
+        pct exec 110 -- sh -c '
+        sed -i "/{{ lxc_hostname }}\.in\.s3ntin3l8\.de/d" /etc/hosts &&
+        sed -i "/ {{ lxc_hostname }}$/d" /etc/hosts &&
+        systemctl restart pihole-FTL
+        '
+      failed_when: false
+      changed_when: true
+
+    - name: Remove from Ansible inventory
+      delegate_to: localhost
+      ansible.builtin.blockinfile:
+        path: "{{ playbook_dir }}/../inventory.yml"
+        marker: "# {mark} ANSIBLE MANAGED HOST - {{ lxc_hostname }}"
+        state: absent

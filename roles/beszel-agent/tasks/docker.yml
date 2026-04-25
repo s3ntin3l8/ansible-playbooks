@@ -1,0 +1,16 @@
+---
+- name: Run Beszel Agent container
+  community.docker.docker_container:
+    name: beszel-agent
+    image: henrygd/beszel-agent:latest
+    state: started
+    restart_policy: always
+    network_mode: host
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    env:
+      PORT: "{{ beszel_agent_port | default(4567) | string }}"
+      KEY: "{{ beszel_public_key }}"

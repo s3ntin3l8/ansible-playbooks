@@ -1,0 +1,51 @@
+- name: Create observability directory structure
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ observability_hub_path }}"
+    - "{{ observability_hub_path }}/grafana"
+    - "{{ observability_hub_path }}/grafana/provisioning"
+    - "{{ observability_hub_path }}/grafana/provisioning/dashboards"
+    - "{{ observability_hub_path }}/grafana/provisioning/datasources"
+    - "{{ observability_hub_path }}/prometheus"
+    - "{{ observability_hub_path }}/loki"
+    - "{{ observability_hub_path }}/blackbox"
+    - "{{ observability_hub_path }}/alertmanager"
+    - "{{ observability_hub_path }}/gatus"
+    - "{{ observability_hub_path }}/pve-exporter"
+
+- name: Template configuration files
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ observability_hub_path }}/{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - { src: "prometheus.yml.j2", dest: "prometheus/prometheus.yml" }
+    - { src: "loki-config.yml.j2", dest: "loki/loki-config.yml" }
+    - { src: "blackbox.yml.j2", dest: "blackbox/blackbox.yml" }
+    - { src: "alertmanager.yml.j2", dest: "alertmanager/alertmanager.yml" }
+    - { src: "gatus.yaml.j2", dest: "gatus/config.yaml" }
+    - { src: "pve-exporter.yml.j2", dest: "pve-exporter/pve.yml" }
+    - { src: "grafana-dashboards-config.yml.j2", dest: "grafana/provisioning/dashboards/dashboards.yaml" }
+    - { src: "grafana-datasources.yml.j2", dest: "grafana/provisioning/datasources/datasources.yaml" }
+
+- name: Download standard dashboards
+  ansible.builtin.get_url:
+    url: "{{ item.url }}"
+    dest: "{{ observability_hub_path }}/grafana/provisioning/dashboards/{{ item.name }}.json"
+    mode: '0644'
+  loop:
+    - { name: "node-exporter", url: "https://grafana.com/api/dashboards/1860/revisions/32/download" }
+    - { name: "docker-monitoring", url: "https://grafana.com/api/dashboards/193/revisions/5/download" }
+    - { name: "blackbox-exporter", url: "https://grafana.com/api/dashboards/7522/revisions/1/download" }
+    - { name: "proxmox", url: "https://grafana.com/api/dashboards/10347/revisions/1/download" }
+    - { name: "pihole", url: "https://grafana.com/api/dashboards/10176/revisions/1/download" }
+
+- name: Deploy Observability Stack via Docker Compose
+  community.docker.docker_compose_v2:
+    project_name: observability
+    project_src: "{{ observability_hub_path }}"
+    definition: "{{ lookup('template', 'docker-compose.yml.j2') | from_yaml }}"
+    state: present

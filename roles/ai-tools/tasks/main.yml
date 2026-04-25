@@ -9,29 +9,52 @@
     state: present
     update_cache: true
 
-- name: Check if Node.js is installed
-  ansible.builtin.command: node -v
-  register: node_v_check
-  failed_when: false
-  changed_when: false
+- name: Install nvm
+  ansible.builtin.shell:
+    cmd: "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ ai_tools_nvm_version }}/install.sh | bash"
+    creates: "/home/{{ primary_user }}/.nvm/nvm.sh"
+  become: true
+  become_user: "{{ primary_user }}"
 
-- name: Add NodeSource GPG key and repository
+- name: Install Node.js via nvm
   ansible.builtin.shell:
     cmd: |
-      set -o pipefail
-      curl -fsSL https://deb.nodesource.com/setup_{{ ai_tools_node_version }}.x | bash -
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      nvm install {{ ai_tools_node_version }}
+      nvm alias default {{ ai_tools_node_version }}
     executable: /bin/bash
-  when: node_v_check.rc != 0 or not node_v_check.stdout.startswith('v' ~ ai_tools_node_version | string)
+    creates: "/home/{{ primary_user }}/.nvm/alias/default"
+  become: true
+  become_user: "{{ primary_user }}"
 
-- name: Install Node.js
-  ansible.builtin.apt:
-    name: nodejs
-    state: latest
-    update_cache: true
+- name: Ensure NVM is sourced in shell profile
+  ansible.builtin.lineinfile:
+    path: "/home/{{ primary_user }}/.zshrc"
+    line: 'export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
+    create: yes
+    owner: "{{ primary_user }}"
+    mode: '0644'
 
 - name: Install global AI CLI tools
-  ansible.builtin.npm:
-    name: "{{ item }}"
-    global: true
-    state: present
+  ansible.builtin.shell:
+    cmd: |
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      npm install -g {{ item }}
+    executable: /bin/bash
   loop: "{{ ai_tools_npm_packages }}"
+  become: true
+  become_user: "{{ primary_user }}"
+  changed_when: false # npm install -g is mostly idempotent but shell always reports change
+
+- name: Append 'ai' tag to Proxmox LXC
+  delegate_to: proxmox
+  ansible.builtin.shell: |
+    EXISTING_TAGS=$(pct config {{ proxmox_vmid }} | grep '^tags:' | awk '{print $2}')
+    if [[ "$EXISTING_TAGS" != *"ai"* ]]; then
+      NEW_TAGS="${EXISTING_TAGS}${EXISTING_TAGS:+;}ai"
+      pct set {{ proxmox_vmid }} --tags "$NEW_TAGS"
+    fi
+  when: proxmox_vmid is defined
+  changed_when: true

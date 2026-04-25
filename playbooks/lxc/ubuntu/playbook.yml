@@ -1,0 +1,23 @@
+---
+- name: Deploy Ubuntu LTS LXC on Proxmox
+  hosts: proxmox
+  gather_facts: no
+  roles:
+    - role: lxc-ubuntu
+      vars:
+        lxc_type: "{{ lxc_type | default('core') }}"
+        lxc_index: "{{ lxc_index | default(1) }}"
+        # Hardware Overrides
+        lxc_cores: 2
+        lxc_memory: 2048
+        lxc_disk_size: 10G
+        lxc_storage: "local-lvm"
+
+- name: Configure the new LXC container
+  hosts: "{{ lxc_hostname | default('managed_containers') }}"
+  gather_facts: yes
+  become: yes
+  roles:
+    - common
+    - beszel-agent
+    - grafana-alloy

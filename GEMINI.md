@@ -5,42 +5,35 @@ This document provides foundational mandates and context for this workspace.
 ## Mandates
 
 - **Venv Execution:** All commands MUST run from the virtual environment: `~/ansible/venv`.
-- **Keyless Security:** NEVER store private SSH keys on this VM. Use **SSH Agent Forwarding** (via 1Password) from your local machine.
-- **Identity-First:** Perform all operations as the primary user (default: `bjoern`). Use the `ansible` user only for automation/service identity.
-- **Global Config:** Always use the root `ansible.cfg` and `inventory.yml`. Do not create local inventory files in playbook directories.
+- **Keyless Security:** NEVER store private SSH keys on this VM. Use **SSH Agent Forwarding** from your local machine.
+- **Identity-First:** Perform all operations as the primary user (default: `bjoern`). Use the `ansible` user only for automation.
+- **Global Config:** Always use the root `ansible.cfg` and `inventory.yml`. No local inventory files.
+- **Observability-First:** Every host MUST be provisioned with **Grafana Alloy** and **Beszel Agent** for immediate enrollment in the monitoring hub.
 
 ## Workspace Context
 
-- **Proxmox Host:** Target host is defined in `.env` as `PROXMOX_HOST_IP`.
-- **Identity Provisioning:** Every deployment (LXC/VM) must provision:
-    - `ansible`: For automated management (passwordless sudo).
-    - Primary User: For personal access (passwordless sudo, GitHub keys).
-- **Docker Support:** LXC containers require `nesting=1,keyctl=1` and `unprivileged=1`.
+- **Management Hub (vmid: 101):** The centralized "Control Tower" hosting Ansible, Grafana, Loki, Prometheus, NetBox, and Beszel Hub.
+- **Identity Provisioning:** Every deployment (LXC/VM) provisions the `ansible` user and the `primary user`.
+- **Docker Support:** LXC containers require `nesting=1,keyctl=1,unprivileged=1`.
 
 ## Configuration Logic (Obfuscation)
 
-The repository uses a split configuration strategy to remain shareable while staying secure:
-
-- **`.env` File (Local Only):** Stores "semi-sensitive" environment structural data (IPs, subnets, usernames, public keys). This file is ignored by Git. Use `.env.example` as a template.
-- **`ansible-vault` (`vault.yml`):** Stores true cryptographic secrets (API token secrets, auth keys, passwords).
-- **Just-in-Time Templating:** The `proxmox.yml` and `inventory.yml` files are dynamically rendered from `.j2` templates via `make prepare` using values from the `.env` file.
+- **`.env` File (Local Only):** Stores IPs, subnets, and structural data. Ignored by Git.
+- **`ansible-vault`:** Stores cryptographic secrets (API tokens, passwords).
+- **JIT Templating:** Inventories (`inventory.yml`, `proxmox.yml`, `netbox_inventory.yml`) are rendered from `.j2` templates via `make prepare`.
 
 ## Common Workflows (Use Makefile)
 
-- **`make prepare`**: Render inventories from `.env`. (Called automatically by other targets).
-- **`make dev-box`**: Deploy the specialized AI/Dev LXC container (`dev-01`).
-- **`make lxc`**: Provision a standard Ubuntu LXC.
-- **`make alpine`**: Provision a standard Alpine LXC.
-- **`make vm`**: Provision new VM.
-- **`make destroy id=X`**: Teardown LXC and cleanup DNS/Inventory.
-- **`make inv`**: View rendered inventory graph.
-- **`make check`**: Validate playbook syntax.
+- **`make prepare`**: Render all dynamic inventories from `.env`.
+- **`make management-lxc`**: Deploy the central Management/Observability hub.
+- **`make lxc` / `make alpine`**: Provision standard containers (includes auto-monitoring).
+- **`make dev-box`**: Deploy specialized AI/Dev LXC (`dev-01`).
+- **`make inv`**: View the unified inventory graph (Proxmox + Static + NetBox).
 
 ## LXC Naming & ID Scheme
 
-IDs and hostnames are calculated based on `lxc_type` and `lxc_index`:
-- **Core (100+)**: Infrastructure (Pi-hole, Tailscale).
-- **Docker (300+)**: Docker hosts.
-- **K3s (400+)**: Kubernetes nodes.
-- **Dev (500+)**: Development boxes.
-- **OpenClaw (600+)**: OpenClaw application nodes.
+- **Core (100+)**: Infrastructure (Management: 101, Pi-hole, Tailscale).
+- **Docker (300+)**: Dedicated Docker application hosts.
+- **K3s (400+)**: Kubernetes cluster nodes.
+- **Dev (500+)**: High-performance development boxes.
+- **OpenClaw (600+)**: Application-specific nodes.

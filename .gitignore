@@ -38,4 +38,6 @@ var/
 .env
 proxmox.yml
 inventory.yml
+netbox_inventory.yml
 backups/
+scratch/

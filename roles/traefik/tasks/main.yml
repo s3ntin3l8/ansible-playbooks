@@ -1,0 +1,56 @@
+---
+- name: Create Traefik configuration directory
+  ansible.builtin.file:
+    path: "{{ traefik_config_path }}"
+    state: directory
+    mode: '0755'
+
+- name: Create acme.json with correct permissions
+  ansible.builtin.file:
+    path: "{{ traefik_config_path }}/acme.json"
+    state: touch
+    mode: '0600'
+  when: traefik_is_gateway
+
+- name: Deploy Traefik static configuration
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ traefik_config_path }}/traefik.yml"
+    mode: '0644'
+  notify: Restart Traefik
+
+- name: Deploy Traefik dynamic configuration (Gateway only)
+  ansible.builtin.template:
+    src: dynamic_gateway.yml.j2
+    dest: "{{ traefik_config_path }}/dynamic_gateway.yml"
+    mode: '0644'
+  when: traefik_is_gateway
+  notify: Restart Traefik
+
+- name: Start Traefik container
+  community.docker.docker_container:
+    name: traefik
+    image: "traefik:{{ traefik_version }}"
+    state: started
+    restart_policy: always
+    network_mode: bridge
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "{{ traefik_config_path }}/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "{{ traefik_config_path }}/acme.json:/etc/traefik/acme.json"
+      - "{{ traefik_config_path }}/dynamic_gateway.yml:/etc/traefik/dynamic_gateway.yml:ro"
+    env:
+      CF_API_EMAIL: "{{ traefik_cf_email }}"
+      CF_API_KEY: "{{ traefik_cf_api_key }}"
+    labels:
+      traefik.enable: "true"
+      # Gateway dashboard exposure
+      traefik.http.routers.dashboard.rule: "Host(`traefik.{{ traefik_domain }}`)"
+      traefik.http.routers.dashboard.service: api@internal
+      traefik.http.routers.dashboard.entrypoints: websecure
+      traefik.http.routers.dashboard.tls.certresolver: cloudflare
+      pihole.dns: "traefik.{{ traefik_domain }}"

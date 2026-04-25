@@ -71,19 +71,16 @@ The `lxc_vmid` and `lxc_hostname` are automatically calculated based on the `lxc
 
 ## 📂 Project Structure
 
-*   `inventory.yml` - Static inventory.
-*   `proxmox.yml` - Dynamic inventory plugin for Proxmox.
-*   `playbooks/` - Specialized playbooks for different tasks.
-    *   `lxc-ubuntu/` - Ubuntu LXC provisioning logic.
-    *   `lxc-alpine/` - Alpine LXC provisioning logic.
-    *   `deploy-vm/` - VM provisioning logic.
-    *   `deploy-openclaw/` - OpenClaw installer.
-    *   `deploy-f1-timing.yml` - F1 Replay Timing app deployment.
-    *   `deploy-management-lxc.yml` - Infrastructure management container.
-    *   `backup-pihole.yml` - Pi-hole configuration backup.
-*   `roles/` - Shared Ansible roles.
-*   `group_vars/` - Variable definitions (including encrypted secrets).
-*   `assets/` - Brand assets and logos.
+* `inventory.yml` - Static inventory.
+* `proxmox.yml` - Dynamic inventory plugin for Proxmox.
+* `playbooks/` - Specialized playbooks categorized by deployment type.
+  * `lxc/` - Provisioning of LXC containers (Ubuntu, Alpine, Pi-hole, Docker Hosts, etc.).
+  * `docker/` - Deployment of applications on Docker (F1 Timing, Monitoring, etc.).
+  * `maintenance/` - Operational tasks (Proxmox maintenance, backups, etc.).
+  * `vm/deploy/` - VM provisioning logic.
+* `roles/` - Shared Ansible roles.
+* `group_vars/` - Variable definitions (including encrypted secrets).
+* `assets/` - Brand assets and logos.
 
 ## 🔒 Security
 

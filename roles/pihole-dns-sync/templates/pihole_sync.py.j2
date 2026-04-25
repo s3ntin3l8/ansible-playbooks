@@ -1,0 +1,118 @@
+import docker
+import requests
+import time
+import os
+import json
+import logging
+
+# Configuration from environment
+PIHOLE_URLS = os.getenv("PIHOLE_URLS", "").split(",")
+PIHOLE_PASSWORD = os.getenv("PIHOLE_PASSWORD")
+DOCKER_HOST_IP = os.getenv("DOCKER_HOST_IP")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Wait for Docker socket to be available
+while True:
+    try:
+        client = docker.from_env()
+        client.ping()
+        break
+    except Exception as e:
+        logging.warning(f"Waiting for docker socket... {e}")
+        time.sleep(5)
+
+class PiHoleClient:
+    def __init__(self, url, password):
+        self.url = url.rstrip('/')
+        self.password = password
+        self.sid = None
+        self.csrf = None
+
+    def authenticate(self):
+        logging.info(f"Authenticating with Pi-hole at {self.url}")
+        try:
+            resp = requests.post(f"{self.url}/api/auth", json={"password": self.password}, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                self.sid = data.get("session", {}).get("sid")
+                self.csrf = data.get("session", {}).get("csrf")
+                logging.info(f"Authentication successful for {self.url}")
+                return True
+            logging.error(f"Authentication failed for {self.url}: {resp.status_code} {resp.text}")
+        except Exception as e:
+            logging.error(f"Request failed for {self.url}: {e}")
+        return False
+
+    def update_record(self, domain, ip, action="PUT"):
+        if not self.sid: 
+            if not self.authenticate(): return False
+        
+        headers = {
+            "X-FTL-SID": self.sid,
+            "X-CSRF-Token": self.csrf,
+            "Accept": "application/json"
+        }
+        
+        # In v6, records are managed at /api/config/dns/hosts/<IP>%20<DOMAIN>
+        encoded_pair = f"{ip} {domain}".replace(" ", "%20")
+        url = f"{self.url}/api/config/dns/hosts/{encoded_pair}"
+        
+        logging.info(f"{'Adding' if action == 'PUT' else 'Removing'} record on {self.url}: {domain} -> {ip}")
+        try:
+            resp = requests.request(action, url, headers=headers, cookies={"sid": self.sid}, timeout=10)
+            if resp.status_code in [200, 204]:
+                logging.info(f"Successfully {action} record on {self.url}")
+                return True
+            elif resp.status_code == 401: # Token expired
+                logging.info(f"Session expired for {self.url}, re-authenticating...")
+                self.authenticate()
+                return self.update_record(domain, ip, action)
+            
+            logging.error(f"Failed to {action} record on {self.url}: {resp.status_code} {resp.text}")
+        except Exception as e:
+            logging.error(f"Request failed for {self.url}: {e}")
+        return False
+
+pihole_clients = [PiHoleClient(url, PIHOLE_PASSWORD) for url in PIHOLE_URLS if url]
+
+def update_all_piholes(domain, ip, action):
+    for client in pihole_clients:
+        client.update_record(domain, ip, action)
+
+def sync_existing_containers():
+    logging.info("Syncing existing containers...")
+    for container in client.containers.list():
+        dns_name = container.labels.get("pihole.dns")
+        if dns_name:
+            update_all_piholes(dns_name, DOCKER_HOST_IP, "PUT")
+
+def monitor_events():
+    logging.info("Starting Docker event monitor...")
+    for event in client.events(decode=True):
+        if event['Type'] == 'container':
+            action = event['Action']
+            container_id = event['id']
+            
+            if action in ['start', 'die']:
+                try:
+                    container = client.containers.get(container_id)
+                    dns_name = container.labels.get("pihole.dns")
+                    if dns_name:
+                        api_action = "PUT" if action == 'start' else "DELETE"
+                        update_all_piholes(dns_name, DOCKER_HOST_IP, api_action)
+                except Exception as e:
+                    if action == 'die':
+                        logging.debug(f"Container {container_id} not found on die event.")
+                    else:
+                        logging.error(f"Error processing event: {e}")
+
+if __name__ == "__main__":
+    # Initial authentication
+    for client in pihole_clients:
+        client.authenticate()
+        
+    sync_existing_containers()
+    monitor_events()
+

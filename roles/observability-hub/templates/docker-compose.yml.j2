@@ -1,0 +1,92 @@
+---
+services:
+  grafana:
+    image: {{ grafana_image }}
+    container_name: grafana
+    restart: always
+    volumes:
+      - ./grafana:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password | default('admin') }}
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.grafana.rule: "Host(`{{ grafana_subdomain }}.{{ traefik_domain }}`)"
+      traefik.http.routers.grafana.entrypoints: "web"
+      traefik.http.services.grafana.loadbalancer.server.port: "3000"
+
+  prometheus:
+    image: {{ prometheus_image }}
+    container_name: prometheus
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+  loki:
+    image: {{ loki_image }}
+    container_name: loki
+    restart: always
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml
+      - ./loki/data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.loki.rule: "Host(`{{ loki_subdomain }}.{{ traefik_domain }}`)"
+      traefik.http.routers.loki.entrypoints: "web"
+      traefik.http.services.loki.loadbalancer.server.port: "3100"
+
+  blackbox-exporter:
+    image: {{ blackbox_image }}
+    container_name: blackbox-exporter
+    restart: always
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+
+  alertmanager:
+    image: {{ alertmanager_image }}
+    container_name: alertmanager
+    restart: always
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+
+  gatus:
+    image: {{ gatus_image }}
+    container_name: gatus
+    restart: always
+    volumes:
+      - ./gatus/config.yaml:/config/config.yaml
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.gatus.rule: "Host(`{{ gatus_subdomain }}.{{ traefik_domain }}`)"
+      traefik.http.routers.gatus.entrypoints: "web"
+      traefik.http.services.gatus.loadbalancer.server.port: "8080"
+
+  pve-exporter:
+    image: {{ pve_exporter_image }}
+    container_name: pve-exporter
+    restart: always
+    volumes:
+      - ./pve-exporter/pve.yml:/etc/prometheus/pve.yml
+    command:
+      - '--config.file=/etc/prometheus/pve.yml'
+
+  pihole-exporter:
+    image: {{ pihole_exporter_image }}
+    container_name: pihole-exporter
+    restart: always
+    environment:
+      - PIHOLE_HOSTNAME={{ hostvars['pihole_lxc'].ansible_host | default(hostvars['pihole_lxc'].inventory_hostname) }}
+      - PIHOLE_PASSWORD={{ lookup('env', 'PIHOLE_ADMIN_PASSWORD') | default('changeme') }}
+      - INTERVAL=30s
+      - PORT=9617

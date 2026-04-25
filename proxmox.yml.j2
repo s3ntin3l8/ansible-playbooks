@@ -22,6 +22,11 @@ compose:
     if proxmox_vmtype == 'lxc' else
     (proxmox_agent_interfaces | default([]) | selectattr('name', 'ne', 'lo') | map(attribute='ip-addresses') | first | first | default('') | regex_replace('/.*', ''))
 
+keyed_groups:
+  - key: proxmox_tags | default([])
+    prefix: tag
+    separator: "_"
+
 groups:
   lxc: type == 'lxc'
   qemu: type == 'qemu'

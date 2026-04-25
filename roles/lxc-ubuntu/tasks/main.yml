@@ -68,6 +68,7 @@
     --ssh-public-keys /tmp/lxc_pubkey.pub
     --features nesting=1,keyctl=1
     --unprivileged 1
+    --tags "{{ lxc_tags }}"
   when: lxc_status.rc != 0
 
 - name: Apply extra LXC configuration
@@ -81,9 +82,11 @@
   command: "pct start {{ lxc_vmid }}"
   when: lxc_status.rc != 0 or lxc_status.stdout.find('stopped') != -1
 
-- name: Set Proxmox notes from template
+- name: Set Proxmox tags and notes
   command: >
-    pct set {{ lxc_vmid }} --description "{{ lookup('template', 'proxmox_notes.j2') }}"
+    pct set {{ lxc_vmid }} 
+    --description "{{ lookup('template', 'proxmox_notes.j2') }}"
+    --tags "{{ lxc_tags }}"
   changed_when: true
 
 - name: Wait for LXC container to start and get IP

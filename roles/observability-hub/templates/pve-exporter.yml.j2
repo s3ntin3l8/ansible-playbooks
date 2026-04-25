@@ -1,0 +1,5 @@
+default:
+  user: "{{ lookup('env', 'PROXMOX_USER') | default('ansible@pam') }}"
+  token_name: "{{ lookup('env', 'PROXMOX_TOKEN_ID') | default('ansible') }}"
+  token_value: "{{ lookup('env', 'PROXMOX_TOKEN_SECRET') | default('your_token_here') }}"
+  verify_ssl: false

@@ -1,0 +1,32 @@
+storage:
+  type: sqlite
+  path: /config/data.db
+
+metrics: true
+
+endpoints:
+  - name: Grafana
+    url: "http://grafana:3000/api/health"
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+  
+  - name: Loki
+    url: "http://loki:3100/ready"
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Pi-hole
+    url: "http://pihole.{{ traefik_domain }}/admin/"
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+
+  {% if proxmox_host_ip is defined %}
+  - name: Proxmox Host
+    url: "icmp://{{ lookup('env', 'PROXMOX_HOST_IP') }}"
+    interval: 30s
+    conditions:
+      - "[CONNECTED] == true"
+  {% endif %}

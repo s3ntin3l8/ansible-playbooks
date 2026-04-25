@@ -1,0 +1,18 @@
+---
+- name: Set agent mode
+  set_fact:
+    beszel_agent_mode: "{{ agent_mode | default('docker' if docker_installed | default(false) else 'binary') }}"
+
+- name: Include mode-specific tasks
+  include_tasks: "{{ beszel_agent_mode }}.yml"
+
+- name: Append 'monitoring' tag to Proxmox LXC
+  delegate_to: proxmox
+  ansible.builtin.shell: |
+    EXISTING_TAGS=$(pct config {{ proxmox_vmid }} | grep '^tags:' | awk '{print $2}')
+    if [[ "$EXISTING_TAGS" != *"monitoring"* ]]; then
+      NEW_TAGS="${EXISTING_TAGS}${EXISTING_TAGS:+;}monitoring"
+      pct set {{ proxmox_vmid }} --tags "$NEW_TAGS"
+    fi
+  when: proxmox_vmid is defined
+  changed_when: true

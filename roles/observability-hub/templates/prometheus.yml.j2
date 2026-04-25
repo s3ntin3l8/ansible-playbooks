@@ -1,0 +1,98 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://www.google.com
+        {% if traefik_domain is defined %}
+        - http://pihole.{{ traefik_domain }}
+        {% endif %}
+        {% for host in groups['all'] %}
+        {% if hostvars[host].ansible_host is defined %}
+        - "http://{{ hostvars[host].ansible_host }}"
+        {% endif %}
+        {% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: 'alloy'
+    static_configs:
+      - targets:
+        {% for host in groups['all'] %}
+        - "{{ hostvars[host].ansible_host | default(host) }}:12345"
+        {% endfor %}
+
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik-gateway:8080'] # Assuming Traefik API/Metrics on 8080
+
+  - job_name: 'authentik'
+    static_configs:
+      - targets: ['authentik-server:9000'] # Standard Authentik metrics port
+
+  - job_name: 'gatus'
+    static_configs:
+      - targets: ['gatus:8080']
+
+  - job_name: 'proxmox'
+    metrics_path: /pve
+    params:
+      module: [default]
+    static_configs:
+      - targets:
+        {% for host in groups['proxmox'] | default([]) %}
+        - "{{ hostvars[host].ansible_host | default(host) }}"
+        {% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: pve-exporter:9221
+
+  - job_name: 'pihole'
+    static_configs:
+      - targets: ['pihole-exporter:9617']
+
+  - job_name: 'unraid'
+    static_configs:
+      - targets:
+        {% if groups['unraid'] is defined %}
+        {% for host in groups['unraid'] %}
+        - "{{ hostvars[host].ansible_host | default(host) }}:9100"
+        {% endfor %}
+        {% else %}
+        - "{{ unraid_ip | default('192.168.2.1') }}:9100"
+        {% endif %}
+
+  - job_name: 'plex'
+    static_configs:
+      - targets: ['{{ unraid_ip | default("192.168.2.1") }}:8181'] # Tautulli/Plex exporter
+
+  - job_name: 'arr-stack'
+    static_configs:
+      - targets:
+          - '{{ unraid_ip | default("192.168.2.1") }}:9876' # Sonarr Exportarr
+          - '{{ unraid_ip | default("192.168.2.1") }}:9877' # Radarr Exportarr

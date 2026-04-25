@@ -1,0 +1,33 @@
+- name: Deploy Observability Infrastructure
+  hosts: management
+  become: true
+  roles:
+    - observability-hub
+
+- name: Deploy Beszel Agents across infrastructure
+  hosts: all:!management
+  become: true
+  gather_facts: yes
+
+  tasks:
+    - name: Check if Docker is installed
+      ansible.builtin.command: docker --version
+      register: docker_check
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Set docker_installed fact
+      ansible.builtin.set_fact:
+        docker_installed: "{{ docker_check.rc == 0 }}"
+
+    - name: Deploy Beszel Agent
+      ansible.builtin.include_role:
+        name: beszel-agent
+      vars:
+        agent_mode: "{{ 'binary' if 'proxmox' in group_names else omit }}"
+
+- name: Deploy Grafana Alloy Agents across infrastructure
+  hosts: all:!management
+  become: true
+  roles:
+    - grafana-alloy

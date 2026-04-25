@@ -1,6 +1,7 @@
 ---
-# Node.js version to install via NodeSource
+# Node.js version to install via nvm
 ai_tools_node_version: 24
+ai_tools_nvm_version: "v0.39.7"
 
 # Global NPM packages to install
 ai_tools_npm_packages:

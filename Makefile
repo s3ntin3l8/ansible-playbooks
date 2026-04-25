@@ -29,6 +29,8 @@ help:
 	@echo "  make pihole     - Install Pi-hole v6 (Bare Metal)"
 	@echo "  make k3s        - Deploy K3s on Proxmox LXC"
 	@echo "  make alpine     - Deploy a new Alpine LXC container"
+	@echo "  make docker-alpine - Deploy an Alpine Docker Host"
+	@echo "  make docker-ubuntu - Deploy an Ubuntu Docker Host"
 	@echo "  make f1-timing  - Deploy F1 Replay Timing application"
 
 prepare:
@@ -36,26 +38,35 @@ prepare:
 	@echo "🛠️  Preparing Proxmox and Static inventories..."
 	@$(ANSIBLE_BASE) ansible localhost -m template -a "src=proxmox.yml.j2 dest=proxmox.yml" > /dev/null
 	@$(ANSIBLE_BASE) ansible localhost -m template -a "src=inventory.yml.j2 dest=inventory.yml" > /dev/null
+	@$(ANSIBLE_BASE) ansible localhost -m template -a "src=netbox_inventory.yml.j2 dest=netbox_inventory.yml" > /dev/null
 
 lxc: prepare
 	@echo "🚀 Deploying Ubuntu LXC..."
-	$(ANSIBLE) playbooks/lxc-ubuntu/playbook.yml
+	$(ANSIBLE) playbooks/lxc/ubuntu/playbook.yml
 
 dev-box: prepare
 	@echo "🚀 Deploying Dev Box..."
-	$(ANSIBLE) playbooks/deploy-dev-box.yml
+	$(ANSIBLE) playbooks/lxc/dev-box/playbook.yml
 
 management-lxc: prepare
 	@echo "🚀 Deploying Management LXC..."
-	$(ANSIBLE) playbooks/deploy-management-lxc.yml
+	$(ANSIBLE) playbooks/lxc/management-host/playbook.yml
 
 alpine: prepare
 	@echo "🚀 Deploying Alpine LXC..."
-	$(ANSIBLE) playbooks/lxc-alpine/playbook.yml
+	$(ANSIBLE) playbooks/lxc/alpine/playbook.yml
 
 f1-timing: prepare
 	@echo "🚀 Deploying F1 Replay Timing..."
-	$(ANSIBLE) playbooks/deploy-f1-timing.yml
+	$(ANSIBLE) playbooks/docker/f1-timing/playbook.yml
+
+docker-alpine: prepare
+	@echo "🚀 Deploying Alpine Docker Host..."
+	$(ANSIBLE) playbooks/lxc/docker-host-alpine/playbook.yml
+
+docker-ubuntu: prepare
+	@echo "🚀 Deploying Ubuntu Docker Host..."
+	$(ANSIBLE) playbooks/lxc/docker-host-ubuntu/playbook.yml
 
 destroy: prepare
 	@if [ -z "$(id)" ]; then \
@@ -63,27 +74,27 @@ destroy: prepare
 		exit 1; \
 	fi
 	@echo "⚠️  Destroying LXC $(id)..."
-	$(ANSIBLE) playbooks/destroy-lxc.yml -e lxc_vmid=$(id)
+	$(ANSIBLE) playbooks/maintenance/lxc-destroy/playbook.yml -e lxc_vmid=$(id)
 
 pihole: prepare
 	@echo "🚀 Installing Pi-hole on Ubuntu..."
-	$(ANSIBLE) playbooks/pihole-ubuntu.yml
+	$(ANSIBLE) playbooks/lxc/pihole-ubuntu/playbook.yml
 
 pihole-alpine: prepare
 	@echo "🚀 Installing Pi-hole on Alpine..."
-	$(ANSIBLE) playbooks/pihole-alpine.yml
+	$(ANSIBLE) playbooks/lxc/pihole-alpine/playbook.yml
 
 k3s: prepare
 	@echo "🚀 Deploying K3s..."
-	$(ANSIBLE) playbooks/deploy-k3s-lxc.yml
+	$(ANSIBLE) playbooks/lxc/k3s/playbook.yml
 
 vm: prepare
 	@echo "🚀 Deploying VM..."
-	$(ANSIBLE) playbooks/deploy-vm/playbook.yml
+	$(ANSIBLE) playbooks/vm/deploy/playbook.yml
 
 maint: prepare
 	@echo "🛠️  Running Maintenance..."
-	$(ANSIBLE) playbooks/proxmox-maintenance/maintenance.yml
+	$(ANSIBLE) playbooks/maintenance/proxmox/playbook.yml
 
 inv: prepare
 	@echo "📊 Current Inventory Graph:"
@@ -91,20 +102,28 @@ inv: prepare
 
 check: prepare
 	@echo "📋 Checking Playbook Syntax..."
-	$(ANSIBLE) playbooks/lxc-ubuntu/playbook.yml --syntax-check
-	$(ANSIBLE) playbooks/lxc-alpine/playbook.yml --syntax-check
-	$(ANSIBLE) playbooks/deploy-vm/playbook.yml --syntax-check
-	$(ANSIBLE) playbooks/proxmox-maintenance/maintenance.yml --syntax-check
-	$(ANSIBLE) playbooks/management-apps.yml --syntax-check
-	$(ANSIBLE) playbooks/install-pihole.yml --syntax-check
-	$(ANSIBLE) playbooks/deploy-k3s-lxc.yml --syntax-check
-	$(ANSIBLE) playbooks/deploy-dev-box.yml --syntax-check
-	$(ANSIBLE) playbooks/deploy-management-lxc.yml --syntax-check
-	$(ANSIBLE) playbooks/update-pihole.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/ubuntu/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/alpine/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/vm/deploy/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/maintenance/proxmox/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/docker/monitoring/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/pihole-ubuntu/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/pihole-alpine/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/k3s/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/dev-box/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/management-host/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/docker-host-alpine/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/docker-host-ubuntu/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/maintenance/pihole-update/playbook.yml --syntax-check
+	$(ANSIBLE) playbooks/lxc/traefik/playbook.yml --syntax-check
 
 management: prepare
 	@echo "🚀 Deploying Management Apps..."
-	$(ANSIBLE) playbooks/management-apps.yml
+	$(ANSIBLE) playbooks/docker/monitoring/playbook.yml
+
+traefik-gateway: prepare
+	@echo "🚀 Deploying Traefik Gateway..."
+	$(ANSIBLE) playbooks/lxc/traefik/playbook.yml
 
 list: prepare
 	@echo "📋 Managed Host List:"

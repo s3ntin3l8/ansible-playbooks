@@ -36,3 +36,5 @@ lxc_index: 1
 lxc_vmid: "{{ lxc_naming_schemes[lxc_type | default('core')].id_start + (lxc_index | default(1) | int) }}"
 lxc_hostname: "{{ lxc_naming_schemes[lxc_type | default('core')].prefix }}-{{ '%02d' | format(lxc_index | default(1) | int) }}"
 
+# Environment Tag
+lxc_env: "{{ 'dev' if (lxc_type | default('core') == 'dev') else 'prod' }}"

@@ -1,0 +1,80 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// -- METRICS --
+
+prometheus.exporter.unix "node" { }
+
+prometheus.scrape "node" {
+  targets    = prometheus.exporter.unix.node.targets
+  forward_to = [prometheus.remote_write.local.receiver]
+}
+
+{% if docker_installed | default(false) %}
+prometheus.exporter.cadvisor "docker" {
+  docker_host = "unix:///var/run/docker.sock"
+}
+
+prometheus.scrape "docker" {
+  targets    = prometheus.exporter.cadvisor.docker.targets
+  forward_to = [prometheus.remote_write.local.receiver]
+}
+{% endif %}
+
+prometheus.remote_write "local" {
+  endpoint {
+    url = "{{ prometheus_url }}"
+  }
+}
+
+// -- LOGS --
+
+loki.relabel "journal" {
+  forward_to = [loki.write.local.receiver]
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+}
+
+loki.source.journal "read" {
+  forward_to = [loki.relabel.journal.receiver]
+  labels     = { job = "systemd-journal", host = "{{ inventory_hostname }}" }
+}
+
+loki.source.file "logs" {
+  targets    = [
+    { __path__ = "/var/log/*.log", host = "{{ inventory_hostname }}", job = "varlogs" },
+    {% if 'pihole_hosts' in group_names %}
+    { __path__ = "/var/log/pihole/pihole.log", host = "{{ inventory_hostname }}", job = "pihole" },
+    { __path__ = "/var/log/pihole/FTL.log", host = "{{ inventory_hostname }}", job = "pihole-ftl" },
+    {% endif %}
+  ]
+  forward_to = [loki.write.local.receiver]
+}
+
+{% if docker_installed | default(false) %}
+loki.source.docker "read" {
+  host       = "unix:///var/run/docker.sock"
+  forward_to = [loki.write.local.receiver]
+}
+{% endif %}
+
+loki.write "local" {
+  endpoint {
+    url = "{{ loki_url }}"
+  }
+}
+
+// -- SYSLOG RECEIVER (for Unraid) --
+loki.source.syslog "unraid" {
+  listener {
+    address  = "0.0.0.0:514"
+    protocol = "udp"
+    labels   = { job = "syslog", host = "unraid" }
+  }
+  forward_to = [loki.write.local.receiver]
+}

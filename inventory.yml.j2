@@ -51,3 +51,8 @@ all:
 
     k3s_hosts:
       hosts: {}
+
+    unraid:
+      hosts:
+        unraid-nas:
+          ansible_host: "{{ lookup('env', 'UNRAID_IP') }}"

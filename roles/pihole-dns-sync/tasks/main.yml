@@ -1,0 +1,40 @@
+---
+- name: Create sync script directory
+  ansible.builtin.file:
+    path: "{{ docker_apps_path }}/pihole-dns-sync"
+    state: directory
+    mode: '0755'
+
+- name: Deploy sync script
+  ansible.builtin.template:
+    src: pihole_sync.py.j2
+    dest: "{{ docker_apps_path }}/pihole-dns-sync/sync.py"
+    mode: '0644'
+
+- name: Deploy requirements.txt
+  ansible.builtin.copy:
+    dest: "{{ docker_apps_path }}/pihole-dns-sync/requirements.txt"
+    content: |
+      docker
+      requests
+    mode: '0644'
+
+- name: Run Pi-hole DNS Sync container
+  community.docker.docker_container:
+    name: pihole-dns-sync
+    image: python:3.11-slim
+    state: started
+    restart_policy: always
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "{{ docker_apps_path }}/pihole-dns-sync/sync.py:/app/sync.py"
+      - "{{ docker_apps_path }}/pihole-dns-sync/requirements.txt:/app/requirements.txt"
+    working_dir: /app
+    entrypoint: ["/bin/sh", "-c", "pip install -r requirements.txt && python sync.py"]
+    env:
+      PIHOLE_URLS: "{{ groups['pihole_hosts'] | map('extract', hostvars, 'ansible_host') | map('regex_replace', '^(.*)$', 'http://\\1') | join(',') }}"
+      PIHOLE_PASSWORD: "{{ pihole_admin_password }}"
+      DOCKER_HOST_IP: "{{ ansible_host }}"
+      LOG_LEVEL: "INFO"
+    labels:
+      pihole.dns: "dns-sync.{{ traefik_domain }}"

@@ -1,0 +1,38 @@
+---
+- name: Provision Dev Box on Proxmox
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    lxc_type: dev
+    lxc_index: 1
+    lxc_memory: 8192  # 8GB RAM for dev/compile
+    lxc_cores: 4      # 4 Cores
+    lxc_disk_size: 50G # More disk for docker/tools
+  roles:
+    - role: lxc-ubuntu
+    - role: lxc-gpu       # Enable AMD GPU for hardware accel/AI
+      vars:
+        lxc_gpu_vmid: "{{ lxc_vmid }}"
+        gpu_type: amd
+
+- name: Configure Dev Box Environment
+  hosts: "{{ lxc_hostname | default('dev-01') }}"
+  remote_user: root
+  become: yes
+  pre_tasks:
+    - name: Wait for connection
+      wait_for_connection:
+        timeout: 60
+  roles:
+    - role: common
+    - role: lxc-gpu
+      vars:
+        gpu_type: amd
+    - role: docker
+      vars:
+        docker_user: "{{ primary_user }}"
+    # - role: rocm-tools
+    - role: dev-environment
+    - role: ai-tools
+    - role: beszel-agent
+    - role: grafana-alloy

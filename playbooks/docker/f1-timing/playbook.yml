@@ -1,0 +1,59 @@
+---
+- name: Deploy F1 Replay Timing Application
+  hosts: dockerhost
+  become: true
+
+  vars:
+    f1_timing_image: "ghcr.io/adn8naiagent/f1replaytiming:latest"
+    f1_timing_port: 8050
+    f1_timing_base_path: "{{ lookup('env', 'DOCKER_APPS_PATH') | default('~/appdata', true) }}/f1-timing"
+    f1_timing_data_path: "{{ f1_timing_base_path }}/data"
+    f1_timing_cache_path: "{{ f1_timing_base_path }}/cache"
+
+  tasks:
+    - name: Ensure requests is installed for the python interpreter
+      ansible.builtin.pip:
+        name: requests
+        state: present
+        break_system_packages: true
+      become: true
+
+    - name: Create F1 Timing directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ docker_user | default(ansible_user) }}"
+        group: docker
+      loop:
+        - "{{ f1_timing_base_path }}"
+        - "{{ f1_timing_data_path }}"
+        - "{{ f1_timing_cache_path }}"
+
+    - name: Deploy F1 Replay Timing container
+      community.docker.docker_container:
+        name: f1-timing
+        image: "{{ f1_timing_image }}"
+        state: started
+        restart_policy: always
+        published_ports:
+          - "{{ f1_timing_port }}:8000"
+        volumes:
+          - "{{ f1_timing_data_path }}/:/data"
+          - "{{ f1_timing_cache_path }}/:/data/fastf1-cache"
+        env:
+          DATA_DIR: "/data"
+          OPENROUTER_API_KEY: "{{ vaulted_openrouter_api_key | default('') }}"
+        labels:
+          pihole.dns: "f1.{{ traefik_domain }}"
+        pull: true
+      vars:
+        ansible_python_interpreter: /usr/bin/python3
+      register: container_status
+
+    - name: Verify F1 Timing container is running
+      assert:
+        that:
+          - container_status.container.State.Running
+        fail_msg: "F1 Timing container failed to start."
+        success_msg: "F1 Timing container is running successfully."
